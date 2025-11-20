@@ -57,7 +57,7 @@ def main():
             })
             headers = {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer bce-v3/ALTAK-KsazKyOQSry0FjfcdVOSI/f002fb85b64e3fef47288165814d61dd32041c3a'
+                'Authorization': ''
             }
             urllib3.disable_warnings()
 
