@@ -42,7 +42,7 @@ def payload_headers_template(prompt):
     })
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer bce-v3/ALTAK-KsazKyOQSry0FjfcdVOSI/f002fb85b64e3fef47288165814d61dd32041c3a'
+        'Authorization': 'Bearer '
     }
 
     return payload, headers
@@ -86,26 +86,6 @@ def main():
             data_response = df.iloc[i]['Responses']
             processing_prompt_response = assessment_prompt_template(data_prompt, data_response)
             payload, headers = payload_headers_template(processing_prompt_response)
-            # print(processing_prompt_response)
-            # payload = json.dumps({
-            #     "model": "qwen3-235b-a22b",
-            #     "messages": [
-            #         {
-            #             "role": "system",
-            #             "content": "You are a helpful assistant."
-            #         },
-            #         {
-            #             "role": "user",
-            #             "content": processing_prompt_response,
-            #         }
-            #     ],
-            #     "max_tokens": 256,
-            #     "temperature": 0.9,
-            # })
-            # headers = {
-            #     'Content-Type': 'application/json',
-            #     'Authorization': 'Bearer bce-v3/ALTAK-KsazKyOQSry0FjfcdVOSI/f002fb85b64e3fef47288165814d61dd32041c3a'
-            # }
             urllib3.disable_warnings()
 
             # 防止网络连接错误，或者api接口未响应等情况
