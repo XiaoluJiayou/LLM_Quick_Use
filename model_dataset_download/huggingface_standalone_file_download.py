@@ -2,7 +2,7 @@ from huggingface_hub import hf_hub_download
 import os
 
 # 替换为您的 Hugging Face 用户访问令牌
-HF_TOKEN = ""
+# HF_TOKEN = ""
 
 # 指定模型ID和文件名
 repo_id = "CompVis/stable-diffusion-v-1-4-original"
@@ -15,7 +15,7 @@ print(f"正在下载 {filename}...")
 downloaded_model_path = hf_hub_download(
     repo_id=repo_id,
     filename=filename,
-    token=HF_TOKEN,
+    # token=HF_TOKEN,
     local_dir="" # 可选：指定下载到的本地目录
 )
 
