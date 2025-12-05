@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="D:\miniforge3" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="D:\miniforge3" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="chatglm3" project-jdk-type="Python SDK" />
 </project>
