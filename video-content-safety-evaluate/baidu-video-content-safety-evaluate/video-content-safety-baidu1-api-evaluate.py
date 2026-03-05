@@ -2,7 +2,7 @@ import requests
 from urllib.parse import quote
 
 API_KEY = ""
-SECRET_KEY = "s"
+SECRET_KEY = ""
 
 
 def main():
