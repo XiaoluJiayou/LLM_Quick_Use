@@ -44,9 +44,16 @@ def extract_single_video(video_path, save_dir, extract_fps=1):
         if not ret:
             break
 
+        # 抽帧循环里，保存图片前加一个判断
+        if saved_count >= 30:  # 最多只抽30帧，防止后续评估显存爆炸
+            break
+
         # 符合间隔则保存
         if frame_count % frame_interval == 0:
-            save_name = f"images_{saved_count + 1}.jpg"
+            # # 修改抽帧后图片的保存路劲名
+            # save_name = f"images_{saved_count + 1}.jpg"
+            # 修改后，直接从001开始，如：001.jpg, 002.jpg，利于后续评估代码的中的路劲排序
+            save_name = f"{saved_count + 1:03d}.jpg"
             save_path = os.path.join(save_dir, save_name)
             cv2.imwrite(save_path, frame)
             saved_count += 1
