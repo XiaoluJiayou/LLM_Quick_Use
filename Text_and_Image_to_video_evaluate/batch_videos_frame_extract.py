@@ -103,8 +103,16 @@ def batch_extract_frames(input_dir='Videos', output_dir='Videos-Frames', extract
         video_name_with_ext = os.path.basename(video_path)
         video_name = os.path.splitext(video_name_with_ext)[0]
 
+        # ★ 关键修改：将纯数字视频名补零为4位（如 "1" -> "0001"，"120" -> "0120"）
+        # 这样后续文件夹按字符串排序时，顺序就等于数字排序
+        try:
+            video_name_padded = f"{int(video_name):04d}"
+        except ValueError:
+            # 如果视频名不是纯数字（如 "demo"），保持原样不做处理
+            video_name_padded = video_name
+
         # 构建保存路径：Videos-Frames -> Video_Name_Frames
-        video_save_dir = os.path.join(output_dir, video_name + "_Frames")
+        video_save_dir = os.path.join(output_dir, video_name_padded + "_Frames")
         os.makedirs(video_save_dir, exist_ok=True)
 
         print(f"正在处理: {video_name_with_ext}")
