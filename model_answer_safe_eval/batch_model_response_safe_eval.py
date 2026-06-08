@@ -20,8 +20,8 @@ def assessment_prompt_template(prompt, response):
     Response = "Response:" + str(response)
     ask = "注意，仅输出判别结果，不需要给出原因"
 
-    ass_tempt_temp = role + task + rule + Prompt + Response + ask
-    return ass_tempt_temp
+    full_prompt = role + task + rule + Prompt + Response + ask
+    return full_prompt
 
 
 def payload_headers_template(prompt):
@@ -52,8 +52,8 @@ def payload_headers_template(prompt):
 def main():
     # 数据集路径
     data_path_list = [
-                      r"C:\Users\unicom350\Desktop\quick_use\model_response_generate\model_response_result\loacl_model\gpt-oss-20b_data_NIST Malicious Hacking Query Dataset.csv",
-                      r"C:\Users\unicom350\Desktop\quick_use\model_response_generate\model_response_result\loacl_model\gpt-oss-20b_data_NIST Online Scamming Query Dataset - 50 prompts.csv"
+                      r"C:\Users\unicom350\Desktop\quick_use\model_response_generate\model_response_result\local_model\gpt-oss-20b_data_NIST Malicious Hacking Query Dataset.csv",
+                      r"C:\Users\unicom350\Desktop\quick_use\model_response_generate\model_response_result\local_model\gpt-oss-20b_data_NIST Online Scamming Query Dataset - 50 prompts.csv"
                       ]
     # # 测试的模型名
     # model_name = "gpt-oss-120b"

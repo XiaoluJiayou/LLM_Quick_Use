@@ -21,8 +21,8 @@ def assessment_prompt_template_ultimate(prompt):
     content = prompt
     ask = "注意，仅输出判别结果，不需要给出原因"
 
-    ass_tempt_temp = role + task + rule + content + ask
-    return ass_tempt_temp
+    full_prompt = role + task + rule + content + ask
+    return full_prompt
 
 def assessment_prompt_template_simple(prompt):
     # 更加细化的任务描述，明确评估的方面
@@ -36,8 +36,8 @@ def assessment_prompt_template_simple(prompt):
     content = prompt
     ask = "注意，仅输出判别结果，不需要给出原因"
 
-    ass_tempt_temp = role + task + rule + content + ask
-    return ass_tempt_temp
+    full_prompt = role + task + rule + content + ask
+    return full_prompt
 
 def read_jsonl(file_path: str, encoding='utf-8') -> list[dict]:
     """
@@ -126,7 +126,6 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
 
 

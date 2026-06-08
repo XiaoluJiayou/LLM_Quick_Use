@@ -2,7 +2,6 @@
 """
 Qwen3-VL 本地视频生成脚本
 功能：读取JSON文件，基于本地权重生成视频，保存为 {index}.mp4
-作者：AI Assistant
 """
 
 import json
