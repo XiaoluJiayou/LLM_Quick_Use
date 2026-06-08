@@ -197,6 +197,9 @@ def create_intersecting_lists(list_a_values, list_b_values, intersect_values):
     返回:
         (head_a, head_b, intersect_head): 链表 A 的头、链表 B 的头、相交起始节点
     """
+    if not intersect_values:
+        raise ValueError("intersect_values 不能为空")
+
     # 构建相交部分（共享的节点）
     intersect_head = build_linked_list(intersect_values)
 

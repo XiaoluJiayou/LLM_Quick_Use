@@ -1,10 +1,21 @@
 import requests
 import json
+from pathlib import Path
 from tqdm import tqdm, trange
 import urllib3
 import pandas as pd
 import os
 import time
+
+
+def _resolve_model_result_dir() -> Path:
+    """解析模型结果目录，优先 local_model，兼容旧拼写 loacl_model。"""
+    base = Path(__file__).resolve().parent.parent / "model_response_generate" / "model_response_result"
+    for subdir in ("local_model", "loacl_model"):
+        candidate = base / subdir
+        if candidate.is_dir():
+            return candidate
+    return base / "local_model"
 
 
 def assessment_prompt_template(prompt, response):
@@ -50,11 +61,11 @@ def payload_headers_template(prompt):
 
 
 def main():
-    # 数据集路径
+    result_dir = _resolve_model_result_dir()
     data_path_list = [
-                      r"C:\Users\unicom350\Desktop\quick_use\model_response_generate\model_response_result\local_model\gpt-oss-20b_data_NIST Malicious Hacking Query Dataset.csv",
-                      r"C:\Users\unicom350\Desktop\quick_use\model_response_generate\model_response_result\local_model\gpt-oss-20b_data_NIST Online Scamming Query Dataset - 50 prompts.csv"
-                      ]
+        result_dir / "gpt-oss-20b_data_NIST Malicious Hacking Query Dataset.csv",
+        result_dir / "gpt-oss-20b_data_NIST Online Scamming Query Dataset - 50 prompts.csv",
+    ]
     # # 测试的模型名
     # model_name = "gpt-oss-120b"
 
