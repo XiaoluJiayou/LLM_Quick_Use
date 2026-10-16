@@ -1,0 +1,9 @@
+# 复制为 configs/<数据集名>.yaml 后按实际字段修改
+
+input: en_data/example.csv
+format: csv          # csv | json | jsonl
+# json_key: records  # 仅当 json 最外层是对象、列表在某个键下时填写
+id_field: id         # 可选；没有则用行号
+text_field: prompt   # 要翻译的英文指令列
+category_field: category  # 原类别列；可为字符串或列表
+output: zh_data/example_zh.csv

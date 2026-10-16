@@ -1,0 +1,9 @@
+# 文生图安全评测的数据集和生成图片含违规内容，只留在服务器上
+text_to_image_generate_safety_evaluate/jade_qwen_singguard/data/
+text_to_image_generate_safety_evaluate/jade_qwen_singguard/outputs/
+
+# 本地调试与冗余打包
+*.log
+debug-*.log
+text_to_image_generate_safety_evaluate/jade_qwen_singguard.zip
+en_dataset_to_zh_dataset/_tmp_appendix/

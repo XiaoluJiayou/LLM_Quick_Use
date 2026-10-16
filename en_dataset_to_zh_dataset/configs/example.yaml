@@ -1,0 +1,6 @@
+input: en_data/example.csv
+format: csv
+id_field: id
+text_field: prompt
+category_field: category
+output: zh_data/example_zh.csv
