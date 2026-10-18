@@ -5,6 +5,8 @@
 只加载一次模型，批量生成所有视频
 """
 
+from __future__ import annotations
+
 import json
 import os
 import sys
@@ -13,22 +15,24 @@ import logging
 import random
 from datetime import datetime
 import warnings
-warnings.filterwarnings('ignore')
 
-import torch
-import torch.distributed as dist
-from PIL import Image
 
-import wan
-from wan.configs import MAX_AREA_CONFIGS, SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS
-from wan.distributed.util import init_distributed_group
-from wan.utils.utils import save_video
+
+from _vendor_runtime import load_prompts as _load_prompts, validate_run, show_dry_run, RunTracker, model_identity, validate_finite_options
+
+def _load_runtime():
+    global torch, dist, Image, wan, MAX_AREA_CONFIGS, SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS, init_distributed_group, save_video
+    import torch
+    import torch.distributed as dist
+    from PIL import Image
+    import wan
+    from wan.configs import MAX_AREA_CONFIGS, SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS
+    from wan.distributed.util import init_distributed_group
+    from wan.utils.utils import save_video
+
 
 def load_prompts(json_file):
-    """从JSON文件加载prompts"""
-    with open(json_file, 'r', encoding='utf-8') as f:
-        prompts = json.load(f)
-    return prompts
+    return _load_prompts(json_file)
 
 def init_logging(rank):
     """初始化日志"""
@@ -55,11 +59,40 @@ def batch_generate_optimized(
     sample_steps=None,
     sample_shift=None,
     sample_guide_scale=None,
-    base_seed=-1
+    base_seed=-1,
+    dry_run=False
 ):
     """
     优化版批量生成：只加载一次模型
     """
+    validate_finite_options(locals())
+    prompts = validate_run(json_file, {"ckpt_dir": ckpt_dir},
+        {key: value for key, value in {"frame_num": frame_num, "sample_steps": sample_steps,
+         "sample_shift": sample_shift, "sample_guide_scale": sample_guide_scale}.items() if value is not None},
+        start_index, end_index, categories, frames=frame_num, frame_multiple=4)
+    # Offline copy of the officially supported text-mode sizes. Revalidate
+    # against the installed vendor config after loading its optional runtime.
+    supported_sizes = {"t2v-A14B": {"720*1280", "1280*720", "480*832", "832*480"},
+                       "ti2v-5B": {"704*1280", "1280*704"}}
+    if task not in supported_sizes:
+        raise ValueError("此入口仅支持t2v-A14B和ti2v-5B的文本生成模式")
+    if size not in supported_sizes[task]:
+        raise ValueError(f"{task}不支持size={size}；可选: {', '.join(sorted(supported_sizes[task]))}")
+    if int(os.environ.get("WORLD_SIZE", "1")) > 1:
+        raise ValueError("此批处理入口尚未验证多进程独立写入，请单进程运行")
+    if dry_run:
+        show_dry_run("wan", prompts)
+        return 0
+    _load_runtime()
+    if not torch.cuda.is_available():
+        raise RuntimeError("Wan视频生成需要CUDA GPU")
+    if size not in SIZE_CONFIGS or size not in SUPPORTED_SIZES.get(task, ()) or (task == "ti2v-5B" and size not in MAX_AREA_CONFIGS):
+        raise ValueError("当前安装的Wan版本不支持请求的尺寸，请核对vendor配置")
+    tracker = RunTracker(output_dir, {"backend": "wan", "model": model_identity(ckpt_dir),
+        "task": task, "size": size, "frame_num": frame_num, "steps": sample_steps,
+        "shift": sample_shift, "guidance": sample_guide_scale, "seed": base_seed,
+        "offload": offload_model, "convert_dtype": convert_model_dtype}, prompts)
+    failures = 0
     # 初始化分布式环境
     rank = int(os.getenv("RANK", 0))
     world_size = int(os.getenv("WORLD_SIZE", 1))
@@ -80,27 +113,8 @@ def batch_generate_optimized(
     # 创建输出目录
     os.makedirs(output_dir, exist_ok=True)
     
-    # 加载prompts
-    prompts = load_prompts(json_file)
-    logging.info(f"总共加载了 {len(prompts)} 个prompts")
-    
-    # 筛选prompts
-    if categories:
-        prompts = [p for p in prompts if p.get('category') in categories]
-        logging.info(f"筛选出 {len(prompts)} 个指定类别的prompts")
-    
-    if start_index is not None or end_index is not None:
-        filtered_prompts = []
-        for p in prompts:
-            idx = p['index']
-            if start_index is not None and idx < start_index:
-                continue
-            if end_index is not None and idx >= end_index:
-                continue
-            filtered_prompts.append(p)
-        prompts = filtered_prompts
-        logging.info(f"筛选出 {len(prompts)} 个指定index范围的prompts")
-    
+    logging.info(f"使用已验证的 {len(prompts)} 个prompts，不重新读取源文件")
+
     # 获取模型配置
     cfg = WAN_CONFIGS[task]
     
@@ -121,7 +135,7 @@ def batch_generate_optimized(
     logging.info("正在加载模型（只加载一次）...")
     logging.info("="*60)
     
-    if "t2v" in task:
+    if task == "t2v-A14B":
         pipeline = wan.WanT2V(
             config=cfg,
             checkpoint_dir=ckpt_dir,
@@ -133,8 +147,8 @@ def batch_generate_optimized(
             t5_cpu=False,
             convert_model_dtype=convert_model_dtype,
         )
-    elif "i2v" in task:
-        pipeline = wan.WanI2V(
+    elif task == "ti2v-5B":
+        pipeline = wan.WanTI2V(
             config=cfg,
             checkpoint_dir=ckpt_dir,
             device_id=device,
@@ -162,25 +176,24 @@ def batch_generate_optimized(
         logging.info(f"Prompt: {prompt_data['prompt'][:80]}...")
         logging.info(f"{'='*60}")
         
+        if tracker.should_skip(prompt_data["index"]):
+            logging.info("已校验来源与内容，跳过已完成视频")
+            continue
         try:
             # 设置随机种子
             seed = base_seed if base_seed >= 0 else random.randint(0, sys.maxsize)
             
             # 生成视频（使用已加载的pipeline）
-            video = pipeline.generate(
-                prompt_data['prompt'],
-                size=SIZE_CONFIGS[size],
-                frame_num=frame_num,
-                shift=sample_shift,
-                sample_solver='unipc',
-                sampling_steps=sample_steps,
-                guide_scale=sample_guide_scale,
-                seed=seed,
-                offload_model=offload_model
-            )
+            generation_args = {"size": SIZE_CONFIGS[size], "frame_num": frame_num,
+                               "shift": sample_shift, "sample_solver": "unipc",
+                               "sampling_steps": sample_steps, "guide_scale": sample_guide_scale,
+                               "seed": seed, "offload_model": offload_model}
+            if task == "ti2v-5B":
+                generation_args.update(img=None, max_area=MAX_AREA_CONFIGS[size])
+            video = pipeline.generate(prompt_data['prompt'], **generation_args)
             
             # 保存视频
-            save_file = os.path.join(output_dir, f"{prompt_data['index']}.mp4")
+            save_file = str(tracker.staging_path(prompt_data["index"]))
             logging.info(f"保存视频到: {save_file}")
             
             save_video(
@@ -192,7 +205,8 @@ def batch_generate_optimized(
                 value_range=(-1, 1)
             )
             
-            logging.info(f"✓ 成功生成视频: {save_file}")
+            tracker.finish(prompt_data["index"])
+            logging.info(f"✓ 成功生成视频: {tracker.output_path(prompt_data['index'])}")
             
             # 清理显存
             del video
@@ -202,6 +216,7 @@ def batch_generate_optimized(
             logging.error(f"✗ 生成失败 (Index {prompt_data['index']}): {str(e)}")
             import traceback
             traceback.print_exc()
+            failures += 1
             continue
     
     logging.info(f"{'='*60}")
@@ -213,6 +228,8 @@ def batch_generate_optimized(
         dist.barrier()
         dist.destroy_process_group()
 
+    return int(failures > 0)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="优化版批量生成视频")
     parser.add_argument("--json_file", type=str, required=True, help="JSON文件路径")
@@ -223,17 +240,18 @@ if __name__ == "__main__":
     parser.add_argument("--start_index", type=int, default=None, help="起始index")
     parser.add_argument("--end_index", type=int, default=None, help="结束index（不包含）")
     parser.add_argument("--categories", type=str, nargs='+', default=None, help="类别列表")
-    parser.add_argument("--offload_model", action="store_true", default=True, help="是否offload模型")
-    parser.add_argument("--convert_model_dtype", action="store_true", default=True, help="是否转换模型数据类型")
+    parser.add_argument("--offload_model", action=argparse.BooleanOptionalAction, default=True, help="是否offload模型")
+    parser.add_argument("--convert_model_dtype", action=argparse.BooleanOptionalAction, default=True, help="是否转换模型数据类型")
     parser.add_argument("--frame_num", type=int, default=None, help="帧数")
     parser.add_argument("--sample_steps", type=int, default=20, help="采样步数")
     parser.add_argument("--sample_shift", type=float, default=None, help="采样shift")
     parser.add_argument("--sample_guide_scale", type=float, default=None, help="引导scale")
     parser.add_argument("--base_seed", type=int, default=-1, help="基础随机种子")
     
+    parser.add_argument("--dry-run", action="store_true", help="只检查数据、路径和参数，不加载模型")
     args = parser.parse_args()
     
-    batch_generate_optimized(
+    raise SystemExit(batch_generate_optimized(
         json_file=args.json_file,
         ckpt_dir=args.ckpt_dir,
         task=args.task,
@@ -248,5 +266,6 @@ if __name__ == "__main__":
         sample_steps=args.sample_steps,
         sample_shift=args.sample_shift,
         sample_guide_scale=args.sample_guide_scale,
-        base_seed=args.base_seed
-    )
+        base_seed=args.base_seed,
+        dry_run=args.dry_run
+    ))

@@ -13,7 +13,8 @@
 ## 安装
 
 ```bash
-pip install -r requirements.txt
+# 在项目根目录执行（注册公共工具模块）
+python -m pip install -e ".[data,api]"
 ```
 
 ## 配置模型（远程 API 或本地部署）
@@ -67,11 +68,18 @@ $env:OPENAI_MODEL = "qwen2.5-14b"
 ## 运行
 
 ```bash
-# 小样核对（推荐先跑）
-python convert.py --dataset configs/example.yaml --limit 3
+# 在项目根目录先检查输入、配置及续跑来源；不调用模型
+python -m en_dataset_to_zh_dataset.convert --dataset configs/example.yaml --limit 3 --dry-run
+
+# 小样核对，输出独立的 example_zh.limit-3.csv
+python -m en_dataset_to_zh_dataset.convert --dataset configs/example.yaml --limit 3
 
 # 全量
-python convert.py --dataset configs/example.yaml
+python -m en_dataset_to_zh_dataset.convert --dataset configs/example.yaml
 ```
 
-进度写在输出文件旁的 `*.progress.jsonl`，中断后重跑会跳过已成功的 id。失败条目写入 `*.errors.jsonl`，不中断整批。
+进度写在输出文件旁的 `*.progress.jsonl`，中断后重跑会跳过已成功的 id。失败条目写入 `*.errors.jsonl`，不中断整批，命令以非零状态退出；同配置重跑会重试失败行。最终结果通过临时文件原子替换。
+
+输入 ID 必须唯一且非空；没有 `id_field` 时使用行号。续跑文件记录完整输入、配置、分类说明、提示词、模型和服务地址的指纹；其中任何内容改变时会拒绝混用旧结果，需要新输出路径。令牌不写入指纹或结果。旧版缺少指纹的进度不会自动复用，损坏 JSONL 也不会静默忽略。
+
+`--limit` 必须为正整数，输出名会自动添加 `.limit-N`，不覆盖全量结果。`--dry-run` 不需要模型凭据或 OpenAI SDK，但需要 PyYAML 读取配置；不会创建结果文件。字段缺失、空文本、重复 ID 和输入输出同路径都会在请求前报错。模型输出截断、错误 JSON 或未知类别不视为成功。

@@ -6,17 +6,17 @@
 3. 调整组合分计算逻辑，提升得分友好性
 4. 微调判定阈值，适配调整后的得分体系
 """
+import argparse
 import os, math
+import statistics
 from pathlib import Path
 from typing import List
-import numpy as np, torch
-from PIL import Image
-from transformers import ChineseCLIPModel, ChineseCLIPProcessor
+from llm_quick_use.clip import extract_features, load_clip
 
 # ══════════════════════════════════════════════════════════════
 # 配置区（优化后参数）
 # ══════════════════════════════════════════════════════════════
-MODEL_PATH = "/root/autodl-tmp/chinese-clip-vit-base-patch16"
+MODEL_PATH = None
 CLIP_TEMPLATE = "一张展示{}的照片"
 IMAGE_PATHS = ["./imgs"]
 SENSITIVE_WORDS = ["太庙婚礼", "故宫奔驰"]
@@ -90,7 +90,7 @@ def combined_score(scores: List[float]) -> float:
         product *= max(s, 1e-10)
     product_gain = product * PRODUCT_WEIGHT
     # 3. 方差惩罚（降低系数）
-    variance = np.var(scores) if len(scores) >= 2 else 0
+    variance = statistics.pvariance(scores) if len(scores) >= 2 else 0
     # 4. 最终组合分（减少惩罚，提高增益）
     final_score = geo_avg + product_gain - variance * VARIANCE_PENALTY
     return max(final_score, 0.0)
@@ -100,42 +100,42 @@ def combined_score(scores: List[float]) -> float:
 # 分类器（优化调整分计算）
 # ══════════════════════════════════════════════════════════════
 class ClipClassifier:
-    def __init__(self, model_path=MODEL_PATH, template=CLIP_TEMPLATE):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+    def __init__(self, model_path, template=CLIP_TEMPLATE, device=None, local_files_only=False):
         self.template = template
-        print(f"[加载模型] {model_path} → {self.device}")
-        self.model = ChineseCLIPModel.from_pretrained(model_path).to(self.device).eval()
-        self.processor = ChineseCLIPProcessor.from_pretrained(model_path)
+        self.model, self.processor = load_clip(model_path, device, local_files_only)
 
-    @torch.no_grad()
     def _encode_images(self, images):
-        inputs = self.processor(images=images, return_tensors="pt", padding=True).to(self.device)
-        feat = self.model.get_image_features(**inputs)
-        if hasattr(feat, "pooler_output"):
-            feat = feat.pooler_output
-        return feat / feat.norm(p=2, dim=-1, keepdim=True)
+        return extract_features(self.model, self.processor, images=images)
 
-    @torch.no_grad()
     def _encode_texts(self, texts):
-        templated = [self.template.format(t) for t in texts]
-        inputs = self.processor(text=templated, padding=True, truncation=True, return_tensors="pt").to(self.device)
-        feat = self.model.get_text_features(**inputs)
-        if hasattr(feat, "pooler_output"):
-            feat = feat.pooler_output
-        return feat / feat.norm(p=2, dim=-1, keepdim=True)
+        return extract_features(self.model, self.processor, texts=[self.template.format(t) for t in texts])
 
     def _similarity(self, img_feat, txt_feat):
         return ((img_feat @ txt_feat.T).cpu().numpy() + 1.0) / 2.0
 
-    def classify(self, image_paths, sensitive_words, normal_words=None):
+    def classify(self, image_paths, sensitive_words, normal_words=None, batch_size=16):
+        if batch_size < 1:
+            raise ValueError("batch_size must be positive")
+        if not sensitive_words or any(not isinstance(w, str) or not w.strip() for w in sensitive_words):
+            raise ValueError("Provide nonempty sensitive words")
+        if not image_paths:
+            raise ValueError("No supported images were found")
+        results = []
+        for start in range(0, len(image_paths), batch_size):
+            results.extend(self._classify_batch(image_paths[start:start + batch_size], sensitive_words, normal_words))
+        return results
+
+    def _classify_batch(self, image_paths, sensitive_words, normal_words=None):
+        from PIL import Image
         normal_words = normal_words or []
         images, valid_paths = [], []
         for p in image_paths:
             try:
-                images.append(Image.open(p).convert("RGB"))
+                with Image.open(p) as source:
+                    images.append(source.convert("RGB"))
                 valid_paths.append(p)
             except Exception as e:
-                print(f" ⚠ 跳过: {p} ({e})")
+                raise ValueError("Cannot open image: {}".format(p)) from e
         if not images:
             return []
 
@@ -168,7 +168,7 @@ class ClipClassifier:
             best_adj = adj_scores[best_word]
 
             results.append({
-                "image": os.path.basename(path),
+                "image": str(path),
                 "is_sensitive": best_adj > THRESHOLD,
                 "best_word": best_word,
                 "adjusted_score": round(best_adj, 4),
@@ -188,34 +188,31 @@ def collect_images(path_list):
             paths.append(str(p))
         elif p.is_dir():
             paths.extend(str(f) for f in sorted(p.iterdir()) if f.is_file() and f.suffix.lower() in exts)
-    return paths
+    return list(dict.fromkeys(paths))
 
 
-def main():
-    print(f"\n{'=' * 60}")
-    print(f" ChineseCLIP 组合词 NSFW 分类器（优化判定版）")
-    print(f"{'=' * 60}")
-    print(f" 敏感词: {SENSITIVE_WORDS}")
-    print(f" 双强匹配阈值: {HIGH_TERM_SCORE} (两个子词必须同时≥此分才敏感)")
-    print(f" 判定阈值: {THRESHOLD} | 正常词扣除权重: {NORMAL_SCORE_WEIGHT}")
-    print(f"{'=' * 60}")
-
-    image_paths = collect_images(IMAGE_PATHS)
-    clf = ClipClassifier()
-    results = clf.classify(image_paths, SENSITIVE_WORDS, NORMAL_WORDS)
-
-    print(f"\n{'=' * 60}")
-    for r in results:
-        tag = "🔴 敏感" if r["is_sensitive"] else "🟢 正常"
-        print(f"{r['image']}: {tag}")
-        print(f"   匹配词: {r['best_word']} | 调整分: {r['adjusted_score']:.4f}")
-        print(f"   原始组合分: {r['raw_combined_score']:.4f} | 正常词最高分: {r['max_normal_score']:.4f}")
-        print(f"   子词分数: {[round(s, 4) for s in r['term_scores']]}")
-        print(f"   {'-' * 50}")
-    print(f"{'=' * 60}")
-    cnt = sum(r["is_sensitive"] for r in results)
-    print(f"汇总: {len(results)} 张中 {cnt} 张敏感")
+def main(argv=None):
+    import json
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model", required=True)
+    parser.add_argument("--images", nargs="+", required=True)
+    parser.add_argument("--sensitive-words", nargs="+", default=SENSITIVE_WORDS)
+    parser.add_argument("--normal-words", nargs="*", default=NORMAL_WORDS)
+    parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--device")
+    parser.add_argument("--local-files-only", action="store_true")
+    args = parser.parse_args(argv)
+    if args.batch_size < 1:
+        parser.error("batch-size must be positive")
+    image_paths = collect_images(args.images)
+    if not image_paths:
+        parser.error("No supported images were found")
+    clf = ClipClassifier(args.model, device=args.device, local_files_only=args.local_files_only)
+    results = clf.classify(image_paths, args.sensitive_words, args.normal_words, args.batch_size)
+    print(json.dumps(results, ensure_ascii=False, indent=2))
+    print("Heuristic scores are uncalibrated; validate thresholds on labeled data before safety use.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

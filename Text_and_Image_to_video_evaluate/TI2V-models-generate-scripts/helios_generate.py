@@ -6,6 +6,8 @@ Helios批量视频生成脚本
 参考: infer_helios.py 和 wan2.2_video_generate.py
 """
 
+from __future__ import annotations
+
 import importlib
 import os
 import json
@@ -15,49 +17,51 @@ import logging
 import random
 import time
 from datetime import datetime
-from tqdm import tqdm
 
-# ========== 新增：禁用 flash-attn 自动下载 + 修复 OMP 环境变量 ==========
-# 强制设置 OMP_NUM_THREADS
-os.environ["OMP_NUM_THREADS"] = "8"  # 根据CPU核心数调整
-# 禁用 kernels 自动下载
-os.environ["KERNELS_DISABLE_AUTOINSTALL"] = "1"
-# 禁用 flash-attn 相关优化
-os.environ["HELIOS_DISABLE_FLASH_ATTN"] = "1"
-# =====================================================================
 
-# 设置环境变量
-os.environ["HF_ENABLE_PARALLEL_LOADING"] = "yes"
-os.environ["HF_PARALLEL_LOADING_WORKERS"] = "8"
 
-if importlib.util.find_spec("torch_npu") is not None:
-    import torch_npu
-else:
-    torch_npu = None
+from _vendor_runtime import load_prompts as _load_prompts, validate_run, show_dry_run, RunTracker, model_identity, validate_finite_options
 
-import torch
-import torch.distributed as dist
-from PIL import Image
+def _load_runtime():
+    global torch_npu, torch, dist, Image, HeliosPipeline, HeliosScheduler, HeliosTransformer3DModel, replace_all_norms_with_flash_norms, replace_rmsnorm_with_fp32, replace_rope_with_flash_rope, load_extra_components, AutoencoderKLWan, export_to_video, load_image
+    # ========== 新增：禁用 flash-attn 自动下载 + 修复 OMP 环境变量 ==========
+    # 强制设置 OMP_NUM_THREADS
+    os.environ.setdefault("OMP_NUM_THREADS", "8")  # 根据CPU核心数调整
+    # 禁用 kernels 自动下载
+    os.environ.setdefault("KERNELS_DISABLE_AUTOINSTALL", "1")
+    # 禁用 flash-attn 相关优化
+    os.environ.setdefault("HELIOS_DISABLE_FLASH_ATTN", "1")
+    # =====================================================================
 
-from helios.diffusers_version.pipeline_helios_diffusers import HeliosPipeline
-from helios.diffusers_version.scheduling_helios_diffusers import HeliosScheduler
-from helios.diffusers_version.transformer_helios_diffusers import HeliosTransformer3DModel
-from helios.modules.helios_kernels import (
-    replace_all_norms_with_flash_norms,
-    replace_rmsnorm_with_fp32,
-    replace_rope_with_flash_rope,
-)
-from helios.utils.utils_base import load_extra_components
+    # 设置环境变量
+    os.environ.setdefault("HF_ENABLE_PARALLEL_LOADING", "yes")
+    os.environ.setdefault("HF_PARALLEL_LOADING_WORKERS", "8")
 
-from diffusers.models import AutoencoderKLWan
-from diffusers.utils import export_to_video, load_image
+    if importlib.util.find_spec("torch_npu") is not None:
+        import torch_npu
+    else:
+        torch_npu = None
+
+    import torch
+    import torch.distributed as dist
+    from PIL import Image
+
+    from helios.diffusers_version.pipeline_helios_diffusers import HeliosPipeline
+    from helios.diffusers_version.scheduling_helios_diffusers import HeliosScheduler
+    from helios.diffusers_version.transformer_helios_diffusers import HeliosTransformer3DModel
+    from helios.modules.helios_kernels import (
+        replace_all_norms_with_flash_norms,
+        replace_rmsnorm_with_fp32,
+        replace_rope_with_flash_rope,
+    )
+    from helios.utils.utils_base import load_extra_components
+
+    from diffusers.models import AutoencoderKLWan
+    from diffusers.utils import export_to_video, load_image
 
 
 def load_prompts(json_file):
-    """从JSON文件加载prompts"""
-    with open(json_file, 'r', encoding='utf-8') as f:
-        prompts = json.load(f)
-    return prompts
+    return _load_prompts(json_file)
 
 
 def init_logging(rank):
@@ -224,6 +228,8 @@ def parse_args():
         help="上下文并行后端"
     )
 
+    parser.add_argument("--attention_backend", default=None, help="显式选择vendor支持的注意力后端；默认保留vendor内置实现，不强制下载flash内核")
+    parser.add_argument("--dry-run", action="store_true", help="只检查数据、路径和参数，不加载模型")
     return parser.parse_args()
 
 
@@ -276,11 +282,14 @@ def load_helios_model(args, device):
     #     try:
     #         transformer.set_attention_backend("_flash_3_hub")
     #     except Exception:
-    #         transformer.set_attention_backend("flash_hub")
+    #         if args.attention_backend is not None:
+        transformer.set_attention_backend(args.attention_backend)
     # else:
-    #     transformer.set_attention_backend("flash_hub")
-    # 强制使用flash_hub，跳过flash-attn3的HuggingFace检查
-    transformer.set_attention_backend("flash_hub")
+    #     if args.attention_backend is not None:
+        transformer.set_attention_backend(args.attention_backend)
+    # Keep the vendor default unless the user explicitly selects an optional backend.
+    if args.attention_backend is not None:
+        transformer.set_attention_backend(args.attention_backend)
 
     # 加载VAE和Scheduler
     logging.info(f"加载VAE和Scheduler: {args.base_model_path}")
@@ -369,6 +378,28 @@ def filter_prompts(prompts, start_index, end_index, categories):
 
 def batch_generate_helios(args):
     """批量生成视频主函数"""
+    validate_finite_options(vars(args))
+    prompts = validate_run(args.json_file, {"base_model_path": args.base_model_path,
+        "transformer_path": args.transformer_path, "lora_path": args.lora_path, "partial_path": args.partial_path},
+        {"height": args.height, "width": args.width, "num_frames": args.num_frames,
+         "fps": args.fps, "num_inference_steps": args.num_inference_steps},
+        args.start_index, args.end_index, args.categories)
+    if args.partial_path and not args.lora_path:
+        raise ValueError("partial_path需要同时指定lora_path")
+    if args.enable_parallelism or int(os.environ.get("WORLD_SIZE", "1")) > 1:
+        raise ValueError("此Helios批处理入口尚未实现可验证的上下文并行及多进程恢复，请单进程运行")
+    if args.dry_run:
+        show_dry_run("helios", prompts)
+        return 0
+    _load_runtime()
+    if not torch.cuda.is_available():
+        raise RuntimeError("Helios视频生成需要CUDA GPU")
+    run_config = {key: value for key, value in vars(args).items()
+                  if key not in {"dry_run", "json_file", "output_folder", "start_index", "end_index", "categories"}}
+    for name in ("base_model_path", "transformer_path", "lora_path", "partial_path"):
+        run_config[name] = model_identity(getattr(args, name)) if getattr(args, name) else None
+    tracker = RunTracker(args.output_folder, {"backend": "helios", **run_config}, prompts)
+    failures = 0
     # 设置设备和分布式
     rank, device, world_size = setup_device_and_distributed(args)
     init_logging(rank)
@@ -377,30 +408,10 @@ def batch_generate_helios(args):
     if rank == 0:
         os.makedirs(args.output_folder, exist_ok=True)
 
-    # 加载prompts
-    if rank == 0:
-        logging.info(f"加载JSON文件: {args.json_file}")
-    prompts = load_prompts(args.json_file)
-
-    if rank == 0:
-        logging.info(f"总共加载了 {len(prompts)} 个prompts")
-
-    # 筛选prompts
-    filtered_prompts = filter_prompts(
-        prompts, args.start_index, args.end_index, args.categories
-    )
-
-    if rank == 0:
-        logging.info(f"筛选后剩余 {len(filtered_prompts)} 个prompts")
-
-    # 分布式数据划分
-    if not args.enable_parallelism and world_size > 1:
-        my_prompts = filtered_prompts[rank::world_size]
-    else:
-        my_prompts = filtered_prompts
-
-    if rank == 0:
-        logging.info(f"当前进程处理 {len(my_prompts)} 个prompts")
+    # Keep the exact validated list recorded by the tracker. This entry
+    # explicitly rejects multi-process mode above.
+    my_prompts = prompts
+    logging.info(f"使用已验证的 {len(my_prompts)} 个prompts，不重新读取源文件")
 
     # 只加载一次模型
     if rank == 0:
@@ -429,8 +440,8 @@ def batch_generate_helios(args):
             logging.info(f"{'=' * 60}")
 
         # 检查文件是否已存在
-        output_path = os.path.join(args.output_folder, f"{idx}.mp4")
-        if os.path.exists(output_path):
+        output_path = str(tracker.staging_path(idx))
+        if tracker.should_skip(idx):
             if rank == 0:
                 logging.info(f"文件已存在，跳过: {output_path}")
             continue
@@ -465,6 +476,7 @@ def batch_generate_helios(args):
             # 保存视频
             if not args.enable_parallelism or rank == 0:
                 export_to_video(output, output_path, fps=args.fps)
+                tracker.finish(idx)
                 if rank == 0:
                     logging.info(f"✓ 成功保存视频: {output_path}")
 
@@ -477,6 +489,7 @@ def batch_generate_helios(args):
                 logging.error(f"✗ 生成失败 (Index {idx}): {str(e)}")
                 import traceback
                 traceback.print_exc()
+            failures += 1
             continue
 
     # 输出显存使用情况
@@ -495,7 +508,8 @@ def batch_generate_helios(args):
         dist.barrier()
         dist.destroy_process_group()
 
+    return int(failures > 0)
 
 if __name__ == "__main__":
     args = parse_args()
-    batch_generate_helios(args)
+    raise SystemExit(batch_generate_helios(args))

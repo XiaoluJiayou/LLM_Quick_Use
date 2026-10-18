@@ -1,0 +1,1017 @@
+{
+  "files": [
+    {
+      "file": "base_ldm.py",
+      "kind": "python",
+      "lines": 194,
+      "imports": [
+        "argparse",
+        "matplotlib",
+        "torch",
+        "torchvision"
+      ]
+    },
+    {
+      "file": "batch_pretrain_data_processing_test.py",
+      "kind": "python",
+      "lines": 73,
+      "imports": [
+        "__future__",
+        "argparse",
+        "json",
+        "llm_quick_use",
+        "os",
+        "pathlib"
+      ]
+    },
+    {
+      "file": "csv_file_merge.py",
+      "kind": "python",
+      "lines": 45,
+      "imports": [
+        "__future__",
+        "argparse",
+        "data_generate",
+        "pathlib"
+      ]
+    },
+    {
+      "file": "data_generate/_csv_tools.py",
+      "kind": "python",
+      "lines": 52,
+      "imports": [
+        "__future__",
+        "contextlib",
+        "csv",
+        "os",
+        "pathlib",
+        "tempfile"
+      ]
+    },
+    {
+      "file": "data_generate/batch_problem_generate_test.ipynb",
+      "kind": "notebook",
+      "code_cells": 7
+    },
+    {
+      "file": "data_generate/data_random_sample.py",
+      "kind": "python",
+      "lines": 49,
+      "imports": [
+        "__future__",
+        "_csv_tools",
+        "argparse",
+        "random"
+      ]
+    },
+    {
+      "file": "data_generate/dataset_batch_generate.ipynb",
+      "kind": "notebook",
+      "code_cells": 6
+    },
+    {
+      "file": "data_generate/generation_utils.py",
+      "kind": "python",
+      "lines": 28,
+      "imports": [
+        "__future__",
+        "llm_quick_use"
+      ]
+    },
+    {
+      "file": "data_generate/large-scale_data_random_sample.py",
+      "kind": "python",
+      "lines": 66,
+      "imports": [
+        "__future__",
+        "_csv_tools",
+        "argparse",
+        "collections",
+        "random"
+      ]
+    },
+    {
+      "file": "en_dataset_to_zh_dataset/convert.py",
+      "kind": "python",
+      "lines": 296,
+      "imports": [
+        "__future__",
+        "argparse",
+        "csv",
+        "io",
+        "json",
+        "llm_quick_use",
+        "openai",
+        "os",
+        "pathlib",
+        "re",
+        "sys",
+        "typing",
+        "yaml"
+      ]
+    },
+    {
+      "file": "full_ldm_encode_decode.py",
+      "kind": "python",
+      "lines": 175,
+      "imports": [
+        "argparse",
+        "torch",
+        "torchvision"
+      ]
+    },
+    {
+      "file": "full_ldm_unet.py",
+      "kind": "python",
+      "lines": 233,
+      "imports": [
+        "argparse",
+        "matplotlib",
+        "torch",
+        "torchvision"
+      ]
+    },
+    {
+      "file": "leetcode.py",
+      "kind": "python",
+      "lines": 55,
+      "imports": []
+    },
+    {
+      "file": "linked_list_intersection.py",
+      "kind": "python",
+      "lines": 396,
+      "imports": []
+    },
+    {
+      "file": "llm_quick_use/__init__.py",
+      "kind": "python",
+      "lines": 3,
+      "imports": []
+    },
+    {
+      "file": "llm_quick_use/batch.py",
+      "kind": "python",
+      "lines": 173,
+      "imports": [
+        "argparse",
+        "csv",
+        "http",
+        "io",
+        "json",
+        "os",
+        "pandas",
+        "pathlib"
+      ]
+    },
+    {
+      "file": "llm_quick_use/clip.py",
+      "kind": "python",
+      "lines": 34,
+      "imports": [
+        "torch",
+        "transformers"
+      ]
+    },
+    {
+      "file": "llm_quick_use/http.py",
+      "kind": "python",
+      "lines": 91,
+      "imports": [
+        "dataclasses",
+        "json",
+        "math",
+        "socket",
+        "time",
+        "typing",
+        "urllib"
+      ]
+    },
+    {
+      "file": "llm_quick_use/io.py",
+      "kind": "python",
+      "lines": 93,
+      "imports": [
+        "__future__",
+        "hashlib",
+        "json",
+        "logging",
+        "os",
+        "pathlib",
+        "tempfile",
+        "typing"
+      ]
+    },
+    {
+      "file": "llm_quick_use/parsing.py",
+      "kind": "python",
+      "lines": 44,
+      "imports": [
+        "__future__",
+        "json"
+      ]
+    },
+    {
+      "file": "llm_quick_use/records.py",
+      "kind": "python",
+      "lines": 27,
+      "imports": [
+        "__future__"
+      ]
+    },
+    {
+      "file": "main.py",
+      "kind": "python",
+      "lines": 16,
+      "imports": []
+    },
+    {
+      "file": "model_answer_safe_eval/batch_model_response_safe_eval.py",
+      "kind": "python",
+      "lines": 10,
+      "imports": [
+        "llm_quick_use"
+      ]
+    },
+    {
+      "file": "model_answer_safe_eval/easy_use.py",
+      "kind": "python",
+      "lines": 28,
+      "imports": [
+        "argparse",
+        "llm_quick_use",
+        "os"
+      ]
+    },
+    {
+      "file": "model_dataset_download/_download_cli.py",
+      "kind": "python",
+      "lines": 62,
+      "imports": [
+        "__future__",
+        "argparse",
+        "huggingface_hub",
+        "json",
+        "modelscope",
+        "os",
+        "pathlib"
+      ]
+    },
+    {
+      "file": "model_dataset_download/dataset_download_huggingface.py",
+      "kind": "python",
+      "lines": 13,
+      "imports": [
+        "_download_cli"
+      ]
+    },
+    {
+      "file": "model_dataset_download/function_111.py",
+      "kind": "python",
+      "lines": 24,
+      "imports": []
+    },
+    {
+      "file": "model_dataset_download/huggingface_standalone_file_download.py",
+      "kind": "python",
+      "lines": 13,
+      "imports": [
+        "_download_cli"
+      ]
+    },
+    {
+      "file": "model_dataset_download/model_download_huggingface.py",
+      "kind": "python",
+      "lines": 13,
+      "imports": [
+        "_download_cli"
+      ]
+    },
+    {
+      "file": "model_dataset_download/model_download_huggingface_standard.py",
+      "kind": "python",
+      "lines": 13,
+      "imports": [
+        "_download_cli"
+      ]
+    },
+    {
+      "file": "model_dataset_download/model_download_modelscope.py",
+      "kind": "python",
+      "lines": 13,
+      "imports": [
+        "_download_cli"
+      ]
+    },
+    {
+      "file": "model_response_generate/api_batch_prompt_answer_generate.py",
+      "kind": "python",
+      "lines": 10,
+      "imports": [
+        "llm_quick_use"
+      ]
+    },
+    {
+      "file": "model_response_generate/batch_model_response_generate.py",
+      "kind": "python",
+      "lines": 10,
+      "imports": [
+        "llm_quick_use"
+      ]
+    },
+    {
+      "file": "OpenClip-Chinese-Project/quick_start.py",
+      "kind": "python",
+      "lines": 37,
+      "imports": [
+        "PIL",
+        "argparse",
+        "llm_quick_use",
+        "pathlib",
+        "torch"
+      ]
+    },
+    {
+      "file": "OpenClip-Chinese-Project/quick_start_pro.py",
+      "kind": "python",
+      "lines": 146,
+      "imports": [
+        "PIL",
+        "argparse",
+        "llm_quick_use",
+        "pathlib",
+        "torch"
+      ]
+    },
+    {
+      "file": "OpenClip-Chinese-Project/quick_start_ultra.py",
+      "kind": "python",
+      "lines": 218,
+      "imports": [
+        "PIL",
+        "argparse",
+        "json",
+        "llm_quick_use",
+        "math",
+        "os",
+        "pathlib",
+        "statistics",
+        "typing"
+      ]
+    },
+    {
+      "file": "tests/test_cloud_wrappers.py",
+      "kind": "python",
+      "lines": 96,
+      "imports": [
+        "_aliyun_video",
+        "importlib",
+        "json",
+        "os",
+        "pathlib",
+        "runpy",
+        "sys",
+        "types",
+        "unittest"
+      ]
+    },
+    {
+      "file": "tests/test_common.py",
+      "kind": "python",
+      "lines": 84,
+      "imports": [
+        "json",
+        "llm_quick_use",
+        "pathlib",
+        "tempfile",
+        "unittest"
+      ]
+    },
+    {
+      "file": "tests/test_data_workflows.py",
+      "kind": "python",
+      "lines": 296,
+      "imports": [
+        "ast",
+        "batch_pretrain_data_processing_test",
+        "contextlib",
+        "csv",
+        "csv_file_merge",
+        "data_generate",
+        "en_dataset_to_zh_dataset",
+        "importlib",
+        "io",
+        "json",
+        "os",
+        "pathlib",
+        "tempfile",
+        "types",
+        "unittest"
+      ]
+    },
+    {
+      "file": "tests/test_downloads.py",
+      "kind": "python",
+      "lines": 65,
+      "imports": [
+        "contextlib",
+        "importlib",
+        "io",
+        "model_dataset_download",
+        "os",
+        "sys",
+        "types",
+        "unittest"
+      ]
+    },
+    {
+      "file": "tests/test_ldm_clip.py",
+      "kind": "python",
+      "lines": 105,
+      "imports": [
+        "importlib",
+        "llm_quick_use",
+        "pathlib",
+        "sys",
+        "torch",
+        "unittest"
+      ]
+    },
+    {
+      "file": "tests/test_notebooks.py",
+      "kind": "python",
+      "lines": 129,
+      "imports": [
+        "PIL",
+        "ast",
+        "contextlib",
+        "json",
+        "llm_quick_use",
+        "os",
+        "pandas",
+        "pathlib",
+        "tempfile",
+        "types",
+        "unittest"
+      ]
+    },
+    {
+      "file": "tests/test_project_check.py",
+      "kind": "python",
+      "lines": 39,
+      "imports": [
+        "pathlib",
+        "tempfile",
+        "tools",
+        "unittest"
+      ]
+    },
+    {
+      "file": "tests/test_text_workflows.py",
+      "kind": "python",
+      "lines": 233,
+      "imports": [
+        "csv",
+        "io",
+        "json",
+        "llm_quick_use",
+        "pathlib",
+        "tempfile",
+        "unittest",
+        "urllib"
+      ]
+    },
+    {
+      "file": "tests/test_video_workflows.py",
+      "kind": "python",
+      "lines": 408,
+      "imports": [
+        "_vendor_runtime",
+        "_video_workflow",
+        "batch_videos_frame_extract",
+        "csv",
+        "image_base94_encode",
+        "importlib",
+        "json",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "types",
+        "unittest"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/_video_workflow.py",
+      "kind": "python",
+      "lines": 261,
+      "imports": [
+        "__future__",
+        "argparse",
+        "csv",
+        "datetime",
+        "hashlib",
+        "io",
+        "json",
+        "llm_quick_use",
+        "math",
+        "os",
+        "pathlib",
+        "re",
+        "torch",
+        "transformers"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/batch_images_series_safety_evaluate_qwen3vl.py",
+      "kind": "python",
+      "lines": 15,
+      "imports": [
+        "_video_workflow"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/batch_video_frames_safety_evaluate_qwen3vl.py",
+      "kind": "python",
+      "lines": 15,
+      "imports": [
+        "_video_workflow"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/batch_video_safety_evaluate.py",
+      "kind": "python",
+      "lines": 15,
+      "imports": [
+        "_video_workflow"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/batch_videos_frame_extract.py",
+      "kind": "python",
+      "lines": 140,
+      "imports": [
+        "_video_workflow",
+        "argparse",
+        "cv2",
+        "json",
+        "math",
+        "os",
+        "pathlib",
+        "tempfile"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/batch_videos_generate_for_dataset.py",
+      "kind": "python",
+      "lines": 39,
+      "imports": [
+        "argparse",
+        "pathlib",
+        "runpy",
+        "sys"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/image_base94_encode.py",
+      "kind": "python",
+      "lines": 82,
+      "imports": [
+        "argparse",
+        "base64",
+        "binascii",
+        "mimetypes",
+        "pathlib"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/single_images_series_safety_evaluate_qwen3vl.py",
+      "kind": "python",
+      "lines": 27,
+      "imports": [
+        "_video_workflow",
+        "argparse",
+        "json"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/TI2V-models-generate-scripts/_vendor_runtime.py",
+      "kind": "python",
+      "lines": 133,
+      "imports": [
+        "hashlib",
+        "json",
+        "llm_quick_use",
+        "math",
+        "os",
+        "pathlib"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/TI2V-models-generate-scripts/helios_generate.py",
+      "kind": "python",
+      "lines": 515,
+      "imports": [
+        "PIL",
+        "__future__",
+        "_vendor_runtime",
+        "argparse",
+        "datetime",
+        "diffusers",
+        "helios",
+        "importlib",
+        "json",
+        "logging",
+        "os",
+        "random",
+        "sys",
+        "time",
+        "torch",
+        "torch_npu",
+        "traceback"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/TI2V-models-generate-scripts/longCat_video_generate.py",
+      "kind": "python",
+      "lines": 254,
+      "imports": [
+        "PIL",
+        "__future__",
+        "_vendor_runtime",
+        "argparse",
+        "datetime",
+        "json",
+        "logging",
+        "longcat_video",
+        "numpy",
+        "os",
+        "random",
+        "sys",
+        "torch",
+        "torchvision",
+        "traceback",
+        "transformers"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/TI2V-models-generate-scripts/LTX-2.3_generate.py",
+      "kind": "python",
+      "lines": 493,
+      "imports": [
+        "__future__",
+        "_vendor_runtime",
+        "argparse",
+        "datetime",
+        "json",
+        "logging",
+        "ltx_core",
+        "ltx_pipelines",
+        "os",
+        "random",
+        "sys",
+        "torch",
+        "traceback",
+        "warnings"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/TI2V-models-generate-scripts/wan2.2_video_generate.py",
+      "kind": "python",
+      "lines": 271,
+      "imports": [
+        "PIL",
+        "__future__",
+        "_vendor_runtime",
+        "argparse",
+        "datetime",
+        "json",
+        "logging",
+        "os",
+        "random",
+        "sys",
+        "torch",
+        "traceback",
+        "wan",
+        "warnings"
+      ]
+    },
+    {
+      "file": "Text_and_Image_to_video_evaluate/video_base64_encode_test.py",
+      "kind": "python",
+      "lines": 34,
+      "imports": [
+        "argparse",
+        "html",
+        "image_base94_encode",
+        "pathlib"
+      ]
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/batch_text_to_img_generate.ipynb",
+      "kind": "notebook",
+      "code_cells": 6
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/img_evaluate_test.ipynb",
+      "kind": "notebook",
+      "code_cells": 6
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/img_generate_test.ipynb",
+      "kind": "notebook",
+      "code_cells": 7
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/config.py",
+      "kind": "python",
+      "lines": 77,
+      "imports": [
+        "math",
+        "os",
+        "pathlib"
+      ]
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/generate_images.py",
+      "kind": "python",
+      "lines": 181,
+      "imports": [
+        "argparse",
+        "config",
+        "diffusers",
+        "json",
+        "logging",
+        "sys",
+        "time",
+        "torch",
+        "traceback",
+        "utils"
+      ]
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/judge_singguard.py",
+      "kind": "python",
+      "lines": 263,
+      "imports": [
+        "PIL",
+        "argparse",
+        "config",
+        "logging",
+        "pathlib",
+        "re",
+        "sys",
+        "time",
+        "torch",
+        "traceback",
+        "transformers",
+        "utils"
+      ]
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/report.py",
+      "kind": "python",
+      "lines": 181,
+      "imports": [
+        "argparse",
+        "collections",
+        "config",
+        "csv",
+        "logging",
+        "sys",
+        "unicodedata",
+        "utils"
+      ]
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/tests/test_generation.py",
+      "kind": "python",
+      "lines": 311,
+      "imports": [
+        "PIL",
+        "config",
+        "contextlib",
+        "csv",
+        "generate_images",
+        "io",
+        "json",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "types",
+        "unittest",
+        "utils"
+      ]
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/tests/test_judge.py",
+      "kind": "python",
+      "lines": 225,
+      "imports": [
+        "PIL",
+        "builtins",
+        "config",
+        "contextlib",
+        "csv",
+        "judge_singguard",
+        "pathlib",
+        "sys",
+        "tempfile",
+        "types",
+        "unittest",
+        "utils"
+      ]
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/tests/test_pipeline.py",
+      "kind": "python",
+      "lines": 118,
+      "imports": [
+        "PIL",
+        "config",
+        "contextlib",
+        "csv",
+        "generate_images",
+        "io",
+        "judge_singguard",
+        "pathlib",
+        "report",
+        "sys",
+        "tempfile",
+        "types",
+        "unittest",
+        "utils"
+      ]
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/tests/test_report.py",
+      "kind": "python",
+      "lines": 86,
+      "imports": [
+        "config",
+        "pathlib",
+        "report",
+        "sys",
+        "unittest",
+        "utils"
+      ]
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/tests/test_utils.py",
+      "kind": "python",
+      "lines": 244,
+      "imports": [
+        "PIL",
+        "argparse",
+        "config",
+        "csv",
+        "json",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "tempfile",
+        "unittest",
+        "utils"
+      ]
+    },
+    {
+      "file": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/utils.py",
+      "kind": "python",
+      "lines": 393,
+      "imports": [
+        "PIL",
+        "argparse",
+        "config",
+        "csv",
+        "hashlib",
+        "json",
+        "logging",
+        "pathlib",
+        "re"
+      ]
+    },
+    {
+      "file": "tools/check_project.py",
+      "kind": "python",
+      "lines": 154,
+      "imports": [
+        "__future__",
+        "argparse",
+        "ast",
+        "json",
+        "os",
+        "pathlib",
+        "re",
+        "sys",
+        "warnings"
+      ]
+    },
+    {
+      "file": "tools/run_checks.py",
+      "kind": "python",
+      "lines": 29,
+      "imports": [
+        "__future__",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys"
+      ]
+    },
+    {
+      "file": "video-content-safety-evaluate/aliyun-content-safety-evaluate/_aliyun_video.py",
+      "kind": "python",
+      "lines": 97,
+      "imports": [
+        "alibabacloud_credentials",
+        "alibabacloud_green20220302",
+        "alibabacloud_tea_openapi",
+        "argparse",
+        "json",
+        "llm_quick_use",
+        "math",
+        "os",
+        "pathlib",
+        "time",
+        "urllib"
+      ]
+    },
+    {
+      "file": "video-content-safety-evaluate/aliyun-content-safety-evaluate/livestream_task_push.py",
+      "kind": "python",
+      "lines": 10,
+      "imports": [
+        "_aliyun_video"
+      ]
+    },
+    {
+      "file": "video-content-safety-evaluate/aliyun-content-safety-evaluate/pull_video_result.py",
+      "kind": "python",
+      "lines": 10,
+      "imports": [
+        "_aliyun_video"
+      ]
+    },
+    {
+      "file": "video-content-safety-evaluate/aliyun-content-safety-evaluate/push_video_task.py",
+      "kind": "python",
+      "lines": 10,
+      "imports": [
+        "_aliyun_video"
+      ]
+    },
+    {
+      "file": "video-content-safety-evaluate/baidu-video-content-safety-evaluate/response-analyze.py",
+      "kind": "python",
+      "lines": 65,
+      "imports": [
+        "argparse",
+        "json",
+        "math",
+        "requests",
+        "urllib"
+      ]
+    },
+    {
+      "file": "video-content-safety-evaluate/baidu-video-content-safety-evaluate/video-content-safety-baidu1-api-evaluate.py",
+      "kind": "python",
+      "lines": 100,
+      "imports": [
+        "argparse",
+        "json",
+        "llm_quick_use",
+        "math",
+        "os",
+        "requests",
+        "urllib"
+      ]
+    },
+    {
+      "file": "video-content-safety-evaluate/prim_test.py",
+      "kind": "python",
+      "lines": 34,
+      "imports": [
+        "typing"
+      ]
+    }
+  ],
+  "issues": [
+    {
+      "file": "leetcode.py",
+      "line": 34,
+      "severity": "warning",
+      "code": "syntax-warning",
+      "message": "invalid escape sequence '\\ '"
+    }
+  ],
+  "summary": {
+    "python_files": 76,
+    "notebooks": 5,
+    "errors": 0,
+    "warnings": 1
+  }
+}

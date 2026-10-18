@@ -1,3 +1,13 @@
-from huggingface_hub import snapshot_download
+"""Import-safe download example; run with --help for configuration."""
+try:
+    from ._download_cli import run_huggingface
+except ImportError:  # Direct script execution.
+    from _download_cli import run_huggingface
 
-snapshot_download(repo_id="openai-community/gpt2", repo_type="model", local_dir="E:\Downloads", resume_download=True)
+
+def main(argv=None):
+    return run_huggingface("openai-community/gpt2", argv=argv)
+
+
+if __name__ == "__main__":
+    main()

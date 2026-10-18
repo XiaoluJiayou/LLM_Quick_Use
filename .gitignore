@@ -7,3 +7,21 @@ text_to_image_generate_safety_evaluate/jade_qwen_singguard/outputs/
 debug-*.log
 text_to_image_generate_safety_evaluate/jade_qwen_singguard.zip
 en_dataset_to_zh_dataset/_tmp_appendix/
+
+# Local environments, credentials, caches and generated package metadata
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+downloads/
+outputs/
+results/
+data/

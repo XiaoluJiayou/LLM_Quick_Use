@@ -1,3 +1,5 @@
+
+from __future__ import annotations
 import os
 import argparse
 import datetime
@@ -5,18 +7,6 @@ import json
 import random
 import sys
 import logging
-import PIL.Image
-import numpy as np
-import torch
-import torch.distributed as dist
-from transformers import AutoTokenizer, UMT5EncoderModel
-from torchvision.io import write_video
-from longcat_video.pipeline_longcat_video import LongCatVideoPipeline
-from longcat_video.modules.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
-from longcat_video.modules.autoencoder_kl_wan import AutoencoderKLWan
-from longcat_video.modules.longcat_video_dit import LongCatVideoTransformer3DModel
-from longcat_video.context_parallel import context_parallel_util
-from longcat_video.context_parallel.context_parallel_util import init_context_parallel
 
 
 def torch_gc():
@@ -24,11 +14,26 @@ def torch_gc():
     torch.cuda.ipc_collect()
 
 
+from _vendor_runtime import load_prompts as _load_prompts, validate_run, show_dry_run, RunTracker, model_identity, validate_finite_options
+
+def _load_runtime():
+    global PIL, np, torch, dist, AutoTokenizer, UMT5EncoderModel, write_video, LongCatVideoPipeline, FlowMatchEulerDiscreteScheduler, AutoencoderKLWan, LongCatVideoTransformer3DModel, context_parallel_util, init_context_parallel
+    import PIL.Image
+    import numpy as np
+    import torch
+    import torch.distributed as dist
+    from transformers import AutoTokenizer, UMT5EncoderModel
+    from torchvision.io import write_video
+    from longcat_video.pipeline_longcat_video import LongCatVideoPipeline
+    from longcat_video.modules.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
+    from longcat_video.modules.autoencoder_kl_wan import AutoencoderKLWan
+    from longcat_video.modules.longcat_video_dit import LongCatVideoTransformer3DModel
+    from longcat_video.context_parallel import context_parallel_util
+    from longcat_video.context_parallel.context_parallel_util import init_context_parallel
+
+
 def load_prompts(json_file):
-    """从JSON文件加载prompts"""
-    with open(json_file, 'r', encoding='utf-8') as f:
-        prompts = json.load(f)
-    return prompts
+    return _load_prompts(json_file)
 
 
 def init_logging(rank):
@@ -44,10 +49,32 @@ def init_logging(rank):
 
 
 def generate(args):
+    validate_finite_options(vars(args))
+    prompts = validate_run(args.json_file, {"checkpoint_dir": args.checkpoint_dir},
+        {"height": args.height, "width": args.width, "num_frames": args.num_frames,
+         "fps": args.fps, "num_inference_steps": args.num_inference_steps,
+         "context_parallel_size": args.context_parallel_size}, args.start_index, args.end_index, args.categories)
+    if not 0 <= args.crf <= 51:
+        raise ValueError("crf须在0到51之间")
+    if args.dry_run:
+        show_dry_run("longcat", prompts)
+        return 0
+    if any(name not in os.environ for name in ("RANK", "LOCAL_RANK", "WORLD_SIZE")):
+        raise ValueError("LongCat入口需要torchrun启动；可先用--dry-run检查输入")
+    world_size = int(os.environ["WORLD_SIZE"])
+    if world_size < 1 or world_size % args.context_parallel_size:
+        raise ValueError("WORLD_SIZE必须为context_parallel_size的正整数倍")
+    if world_size != args.context_parallel_size:
+        raise ValueError("此批处理入口只支持一个完整上下文并行组；WORLD_SIZE须等于context_parallel_size")
+    _load_runtime()
+    if not torch.cuda.is_available():
+        raise RuntimeError("LongCat视频生成需要CUDA GPU")
     # 分布式环境初始化
     rank = int(os.environ['RANK'])
     num_gpus = torch.cuda.device_count()
-    local_rank = rank % num_gpus
+    local_rank = int(os.environ["LOCAL_RANK"])
+    if not 0 <= local_rank < num_gpus:
+        raise ValueError("LOCAL_RANK超出当前CUDA设备范围")
     torch.cuda.set_device(local_rank)
 
     init_logging(rank)
@@ -65,26 +92,13 @@ def generate(args):
     # 创建输出目录
     os.makedirs(args.output_dir, exist_ok=True)
 
-    # 加载并筛选 prompts
-    prompts = load_prompts(args.json_file)
-    logging.info(f"总共加载了 {len(prompts)} 个prompts")
+    logging.info(f"使用已验证的 {len(prompts)} 个prompts，不重新读取源文件")
 
-    if args.categories:
-        prompts = [p for p in prompts if p.get('category') in args.categories]
-        logging.info(f"筛选出 {len(prompts)} 个指定类别的prompts")
-
-    if args.start_index is not None or args.end_index is not None:
-        filtered_prompts = []
-        for p in prompts:
-            idx = p['index']
-            if args.start_index is not None and idx < args.start_index:
-                continue
-            if args.end_index is not None and idx >= args.end_index:
-                continue
-            filtered_prompts.append(p)
-        prompts = filtered_prompts
-        logging.info(f"筛选出 {len(prompts)} 个指定index范围的prompts")
-
+    run_config = {key: value for key, value in vars(args).items()
+                  if key not in {"dry_run", "json_file", "output_dir", "start_index", "end_index", "categories"}}
+    run_config["checkpoint_dir"] = model_identity(args.checkpoint_dir)
+    tracker = RunTracker(args.output_dir, {"backend": "longcat", **run_config}, prompts) if global_rank == 0 else None
+    dist.barrier()
     # ========================================
     # 关键步骤：只加载一次模型！
     # ========================================
@@ -111,7 +125,7 @@ def generate(args):
         scheduler=scheduler,
         dit=dit,
     )
-    pipe.to(local_rank)
+    pipe.to(torch.device("cuda", local_rank))
     logging.info("✓ 模型加载完成！")
     logging.info("=" * 60)
 
@@ -135,10 +149,14 @@ def generate(args):
         logging.info(f"Prompt: {prompt_data['prompt'][:80]}...")
         logging.info(f"{'=' * 60}")
 
+        skip = [tracker.should_skip(prompt_data["index"]) if global_rank == 0 else False]
+        dist.broadcast_object_list(skip, src=0)
+        if skip[0]:
+            continue
         try:
             # 依据 index 生成确定的随机种子，保证多卡生成结果一致
             seed = base_seed + prompt_data['index']
-            generator = torch.Generator(device=local_rank)
+            generator = torch.Generator(device=f"cuda:{local_rank}")
             generator.manual_seed(seed)
 
             # 生成视频 (去除了 distill 和 refine 流程，专注于基础 t2v)
@@ -155,10 +173,16 @@ def generate(args):
 
             # 保存视频 (只在主节点保存，避免多卡重复写入)
             if global_rank == 0:
-                output_tensor = torch.from_numpy(np.array(output))
-                output_tensor = (output_tensor * 255).clamp(0, 255).to(torch.uint8)
+                array = np.asarray(output)
+                if array.ndim != 4 or array.shape[-1] != 3 or array.shape[0] == 0:
+                    raise ValueError("LongCat输出须为非空[T,H,W,3]视频帧")
+                if array.dtype != np.uint8:
+                    if not np.isfinite(array).all() or array.min() < 0 or array.max() > 255:
+                        raise ValueError("LongCat输出像素超出有效范围")
+                    array = np.rint(array * 255 if array.max() <= 1 else array).astype(np.uint8)
+                output_tensor = torch.from_numpy(array)
 
-                save_file = os.path.join(args.output_dir, f"{prompt_data['index']}.mp4")
+                save_file = str(tracker.staging_path(prompt_data["index"]))
                 logging.info(f"保存视频到: {save_file}")
                 write_video(
                     save_file,
@@ -167,7 +191,8 @@ def generate(args):
                     video_codec="libx264",
                     options={"crf": f"{args.crf}"}
                 )
-                logging.info(f"✓ 成功生成视频: {save_file}")
+                tracker.finish(prompt_data["index"])
+                logging.info(f"✓ 成功生成视频: {tracker.output_path(prompt_data['index'])}")
 
             # 清理当前循环的显存
             del output
@@ -177,7 +202,7 @@ def generate(args):
             logging.error(f"✗ 生成失败 (Index {prompt_data['index']}): {str(e)}")
             import traceback
             traceback.print_exc()
-            continue
+            raise
 
     logging.info(f"{'=' * 60}")
     logging.info("批量生成完成！")
@@ -220,9 +245,10 @@ def _parse_args():
                         default="Bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards",
                         help="负面提示词")
 
+    parser.add_argument("--dry-run", action="store_true", help="只检查数据、路径和参数，不加载模型")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = _parse_args()
-    generate(args)
+    raise SystemExit(generate(args))

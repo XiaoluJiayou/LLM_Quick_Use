@@ -6,6 +6,8 @@ LTX-2 批量生成视频脚本（基于 T2VSafetyBench）
 输出文件以 index 命名: 1.mp4, 2.mp4, ...
 """
 
+from __future__ import annotations
+
 import json
 import os
 import sys
@@ -15,24 +17,26 @@ import random
 from datetime import datetime
 
 import warnings
-warnings.filterwarnings('ignore')
 
-import torch
 
 # ============================================================
 # LTX-2 Pipeline 导入
 # ============================================================
-from ltx_pipelines.ti2vid_two_stages import TI2VidTwoStagesPipeline
-from ltx_core.loader import LTXV_LORA_COMFY_RENAMING_MAP, LoraPathStrengthAndSDOps
-from ltx_core.components.guiders import MultiModalGuiderParams
-from ltx_core.quantization import QuantizationPolicy
 
 
-def load_prompts(json_file: str) -> list:
-    """从 JSON 文件加载 prompts"""
-    with open(json_file, 'r', encoding='utf-8') as f:
-        prompts = json.load(f)
-    return prompts
+from _vendor_runtime import load_prompts as _load_prompts, validate_run, show_dry_run, RunTracker, model_identity, validate_finite_options
+
+def _load_runtime():
+    global torch, TI2VidTwoStagesPipeline, LTXV_LORA_COMFY_RENAMING_MAP, LoraPathStrengthAndSDOps, MultiModalGuiderParams, QuantizationPolicy
+    import torch
+    from ltx_pipelines.ti2vid_two_stages import TI2VidTwoStagesPipeline
+    from ltx_core.loader import LTXV_LORA_COMFY_RENAMING_MAP, LoraPathStrengthAndSDOps
+    from ltx_core.components.guiders import MultiModalGuiderParams
+    from ltx_core.quantization import QuantizationPolicy
+
+
+def load_prompts(json_file):
+    return _load_prompts(json_file)
 
 
 def init_logging(rank: int = 0):
@@ -106,6 +110,7 @@ def batch_generate(
     base_seed: int = -1,
     # --- LoRA 强度 ---
     distilled_lora_strength: float = 0.6,
+    dry_run: bool = False,
 ):
     """
     批量生成视频：只加载一次 Pipeline，遍历所有 prompt 进行生成。
@@ -151,36 +156,38 @@ def batch_generate(
     distilled_lora_strength : float
         Distilled LoRA 强度
     """
+    validate_finite_options(locals())
+    prompts = validate_run(json_file, {"checkpoint_path": checkpoint_path,
+        "distilled_lora_path": distilled_lora_path, "spatial_upsampler_path": spatial_upsampler_path,
+        "gemma_root": gemma_root, **{f"lora_{i}": path for i, path in enumerate(lora_paths or [])}},
+        {"height": height, "width": width, "num_frames": num_frames, "frame_rate": frame_rate,
+         "num_inference_steps": num_inference_steps}, start_index, end_index, categories,
+        frames=num_frames, frame_multiple=8)
+    if skip_step < 0 or any(block < 0 for block in (stg_blocks or [])):
+        raise ValueError("skip_step和stg_blocks须为非负整数")
+    if quantization not in {None, "fp8-cast", "fp8-scaled-mm"}:
+        raise ValueError("未知量化策略")
+    if dry_run:
+        show_dry_run("ltx", prompts)
+        return 0
+    _load_runtime()
+    if not torch.cuda.is_available():
+        raise RuntimeError("LTX视频生成需要CUDA GPU")
+    tracker = RunTracker(output_dir, {"backend": "ltx", "checkpoint": model_identity(checkpoint_path),
+        "distilled_lora": model_identity(distilled_lora_path), "upsampler": model_identity(spatial_upsampler_path),
+        "gemma": model_identity(gemma_root), "lora_paths": [model_identity(p) for p in lora_paths or []],
+        "quantization": quantization, "height": height, "width": width, "frames": num_frames,
+        "fps": frame_rate, "steps": num_inference_steps, "cfg": cfg_scale, "stg": stg_scale,
+        "rescale": rescale_scale, "blocks": stg_blocks, "skip": skip_step, "seed": base_seed,
+        "lora_strength": distilled_lora_strength}, prompts)
     init_logging(rank=0)
 
     # 创建输出目录
     os.makedirs(output_dir, exist_ok=True)
 
     # ----------------------------------------------------------------
-    # 1. 加载 prompts 并筛选
-    # ----------------------------------------------------------------
-    prompts = load_prompts(json_file)
-    logging.info(f"总共加载了 {len(prompts)} 个 prompts")
-
-    if categories:
-        prompts = [p for p in prompts if p.get('category') in categories]
-        logging.info(f"筛选出 {len(prompts)} 个指定类别的 prompts: {categories}")
-
-    if start_index is not None or end_index is not None:
-        filtered = []
-        for p in prompts:
-            idx = p['index']
-            if start_index is not None and idx < start_index:
-                continue
-            if end_index is not None and idx >= end_index:
-                continue
-            filtered.append(p)
-        prompts = filtered
-        logging.info(f"筛选出 {len(prompts)} 个指定 index 范围的 prompts")
-
-    if len(prompts) == 0:
-        logging.warning("没有匹配的 prompt，退出。")
-        return
+    # 1. Reuse the validated selection used by the provenance tracker.
+    logging.info(f"使用已验证的 {len(prompts)} 个prompts，不重新读取源文件")
 
     # ----------------------------------------------------------------
     # 2. 构建量化策略
@@ -266,11 +273,11 @@ def batch_generate(
         seed = base_seed if base_seed >= 0 else random.randint(0, 2**32 - 1)
 
         # 输出文件: {index}.mp4
-        output_path = os.path.join(output_dir, f"{prompt_idx}.mp4")
+        output_path = str(tracker.staging_path(prompt_idx))
 
         # 如果已存在，跳过
-        if os.path.exists(output_path):
-            logging.info(f"  ⏭ 已存在，跳过: {output_path}")
+        if tracker.should_skip(prompt_idx):
+            logging.info(f"  ⏭ 已验证来源及内容，跳过: {tracker.output_path(prompt_idx)}")
             success_count += 1
             continue
 
@@ -290,6 +297,7 @@ def batch_generate(
 
             if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
                 file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
+                tracker.finish(prompt_idx)
                 logging.info(f"  ✓ 成功: {output_path} ({file_size_mb:.2f} MB)")
                 success_count += 1
             else:
@@ -322,6 +330,7 @@ def batch_generate(
     logging.info(f"  输出目录: {output_dir}")
     logging.info(f"{'=' * 60}")
 
+    return int(fail_count > 0)
 
 # ==============================================================
 # CLI 入口
@@ -453,9 +462,10 @@ if __name__ == "__main__":
         help="基础随机种子，-1=随机 (默认: -1)"
     )
 
+    parser.add_argument("--dry-run", action="store_true", help="只检查数据、路径和参数，不加载模型")
     args = parser.parse_args()
 
-    batch_generate(
+    raise SystemExit(batch_generate(
         json_file=args.json_file,
         checkpoint_path=args.checkpoint_path,
         distilled_lora_path=args.distilled_lora_path,
@@ -479,4 +489,5 @@ if __name__ == "__main__":
         categories=args.categories,
         base_seed=args.base_seed,
         distilled_lora_strength=args.distilled_lora_strength,
-    )
+        dry_run=args.dry_run,
+    ))

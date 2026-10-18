@@ -2,9 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
-import numpy as np
 
 # 设备配置
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -18,10 +16,12 @@ epochs = 10
 lambda_adv = 1.0  # 对抗损失权重
 lambda_kl = 1e-6  # KL 正则化权重
 
-# 数据加载 (MNIST)
-transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+def create_train_loader(data_dir="./data", batch_size=batch_size, download=False):
+    """Dataset I/O is explicit; importing this module never downloads data."""
+    from torchvision import datasets, transforms
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+    dataset = datasets.MNIST(root=data_dir, train=True, transform=transform, download=download)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # 自动编码器定义
 class Autoencoder(nn.Module):
@@ -82,27 +82,33 @@ class Discriminator(nn.Module):
 class PerceptualLoss(nn.Module):
     def __init__(self):
         super(PerceptualLoss, self).__init__()
-        vgg = models.vgg16(pretrained=True).features.to(device).eval()
+        from torchvision import models
+        if hasattr(models, "VGG16_Weights"):
+            vgg = models.vgg16(weights=models.VGG16_Weights.DEFAULT).features.to(device).eval()
+        else:  # torchvision versions paired with the original demo's torch 1.x
+            vgg = models.vgg16(pretrained=True).features.to(device).eval()
         self.layers = nn.Sequential(*list(vgg.children())[:9])  # 提取前几层
         for param in self.layers.parameters():
             param.requires_grad = False
 
     def forward(self, x, y):
         # MNIST 是单通道，VGG 需要 3 通道，简单重复
-        x = x.repeat(1, 3, 1, 1)
-        y = y.repeat(1, 3, 1, 1)
+        x = (x.repeat(1, 3, 1, 1) + 1) / 2
+        y = (y.repeat(1, 3, 1, 1) + 1) / 2
+        mean = x.new_tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+        std = x.new_tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
+        x, y = (x - mean) / std, (y - mean) / std
         x_feat = self.layers(x)
         y_feat = self.layers(y)
         return F.mse_loss(x_feat, y_feat)
 
 # 训练函数
-def train_autoencoder(ae, disc, percept_loss, ae_optimizer, disc_optimizer):
+def train_autoencoder(ae, disc, percept_loss, ae_optimizer, disc_optimizer, train_loader, epochs=epochs):
     ae.train()
     disc.train()
     for epoch in range(epochs):
         for batch_idx, (data, _) in enumerate(train_loader):
             data = data.to(device)
-            batch_size = data.size(0)
 
             # 训练判别器
             disc_optimizer.zero_grad()
@@ -113,7 +119,9 @@ def train_autoencoder(ae, disc, percept_loss, ae_optimizer, disc_optimizer):
             disc_loss.backward()
             disc_optimizer.step()
 
-            # 训练自动编码器
+            # Only the autoencoder is optimized during its adversarial update.
+            for parameter in disc.parameters():
+                parameter.requires_grad_(False)
             ae_optimizer.zero_grad()
             recon, mu, logvar, z = ae(data)
             fake_pred = disc(recon)
@@ -126,32 +134,42 @@ def train_autoencoder(ae, disc, percept_loss, ae_optimizer, disc_optimizer):
 
             total_loss.backward()
             ae_optimizer.step()
+            for parameter in disc.parameters():
+                parameter.requires_grad_(True)
 
             if batch_idx % 100 == 0:
                 print(f"Epoch [{epoch}/{epochs}], Batch [{batch_idx}], "
                       f"Total Loss: {total_loss.item():.4f}, Perc: {perc_loss.item():.4f}, "
                       f"Adv: {adv_loss.item():.4f}, KL: {kl_loss.item():.4f}")
 
-# 主程序
-if __name__ == "__main__":
-    # 初始化模型
-    ae = Autoencoder().to(device)
-    disc = Discriminator().to(device)
+def main(argv=None):
+    import argparse
+    global device
+    parser = argparse.ArgumentParser(description="Educational perceptual/adversarial MNIST autoencoder")
+    parser.add_argument("--data-dir", default="./data")
+    parser.add_argument("--download", action="store_true", help="Allow MNIST download; full training may also load VGG weights")
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--device", default=str(device))
+    parser.add_argument("--smoke-test", action="store_true", help="Synthetic forward/backward without MNIST or VGG weights")
+    args = parser.parse_args(argv)
+    if min(args.epochs, args.batch_size) < 1:
+        parser.error("epochs and batch-size must be positive")
+    device = torch.device(args.device)
+    torch.manual_seed(0)
+    ae, disc = Autoencoder().to(device), Discriminator().to(device)
+    if args.smoke_test:
+        data = torch.randn(2, channels, image_size, image_size, device=device)
+        recon, mu, logvar, z = ae(data)
+        (F.mse_loss(recon, data) + disc(recon).mean()).backward()
+        print("OK: reconstruction={}, latent={}".format(tuple(recon.shape), tuple(z.shape)))
+        return 0
+    loader = create_train_loader(args.data_dir, args.batch_size, args.download)
     percept_loss = PerceptualLoss().to(device)
+    train_autoencoder(ae, disc, percept_loss, optim.Adam(ae.parameters(), lr=1e-3),
+                      optim.Adam(disc.parameters(), lr=1e-3), loader, epochs=args.epochs)
+    return 0
 
-    # 优化器
-    ae_optimizer = optim.Adam(ae.parameters(), lr=1e-3)
-    disc_optimizer = optim.Adam(disc.parameters(), lr=1e-3)
 
-    # 训练
-    print("Training Autoencoder with Perceptual, Adversarial, and KL Loss...")
-    train_autoencoder(ae, disc, percept_loss, ae_optimizer, disc_optimizer)
-
-    # 测试重建（可选）
-    ae.eval()
-    with torch.no_grad():
-        data, _ = next(iter(train_loader))
-        data = data.to(device)
-        recon, _, _, z = ae(data)
-        print("Latent z shape:", z.shape)  # [batch, latent_dim, 7, 7]
-        print("Reconstructed shape:", recon.shape)  # [batch, 1, 28, 28]
+if __name__ == "__main__":
+    raise SystemExit(main())

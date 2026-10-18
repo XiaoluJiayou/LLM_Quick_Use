@@ -1,143 +1,140 @@
+"""Extract bounded, evenly spaced frames spanning each whole video."""
+import argparse
+import json
+import math
 import os
-import cv2
-import glob
-import time
+from pathlib import Path
+import tempfile
+from _video_workflow import IMAGE_SUFFIXES, VIDEO_SUFFIXES, atomic_json, file_digest, find_files, positive_number
 
 
-def extract_single_video(video_path, save_dir, extract_fps=1):
-    """
-    对单个视频进行抽帧处理
-
-    Args:
-        video_path: 视频文件的完整路径
-        save_dir: 保存图片的文件夹路径
-        extract_fps: 抽帧率 (每秒抽取多少帧)
-
-    Returns:
-        dict: 包含视频信息和处理结果的字典，如果失败则返回 None
-    """
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        return None
-
-    # 获取视频基本信息
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    video_fps = cap.get(cv2.CAP_PROP_FPS)
-
-    # 容错处理：无法读取帧率
-    if video_fps == 0:
-        cap.release()
-        return None
-
-    # 计算抽帧间隔
-    if extract_fps is None or extract_fps >= video_fps:
-        frame_interval = 1
+def sampling_indices(total_frames, video_fps, extract_fps=1, max_frames=30):
+    positive_number(video_fps, "video_fps")
+    if not isinstance(total_frames, int) or total_frames < 1:
+        raise ValueError("视频总帧数必须为正整数")
+    if not isinstance(max_frames, int) or isinstance(max_frames, bool) or max_frames < 1:
+        raise ValueError("max_frames 必须为正整数")
+    if extract_fps is None:
+        count = min(total_frames, max_frames)
     else:
-        frame_interval = int(round(video_fps / extract_fps))
-
-    frame_count = 0
-    saved_count = 0
-
-    # 开始抽帧循环
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        # 抽帧循环里，保存图片前加一个判断
-        if saved_count >= 30:  # 最多只抽30帧，防止后续评估显存爆炸
-            break
-
-        # 符合间隔则保存
-        if frame_count % frame_interval == 0:
-            # # 修改抽帧后图片的保存路劲名
-            # save_name = f"images_{saved_count + 1}.jpg"
-            # 修改后，直接从001开始，如：001.jpg, 002.jpg，利于后续评估代码的中的路劲排序
-            save_name = f"{saved_count + 1:03d}.jpg"
-            save_path = os.path.join(save_dir, save_name)
-            cv2.imwrite(save_path, frame)
-            saved_count += 1
-
-        frame_count += 1
-
-    cap.release()
-
-    # 返回处理结果统计数据
-    return {
-        'total_frames': total_frames,
-        'video_fps': video_fps,
-        'saved_count': saved_count,
-        'duration': total_frames / video_fps if video_fps > 0 else 0,
-        'interval': frame_interval
-    }
+        positive_number(extract_fps, "extract_fps")
+        count = min(total_frames, max_frames, max(1, math.ceil(total_frames / video_fps * extract_fps)))
+    if count == 1:
+        return [total_frames // 2]
+    return [round(i * (total_frames - 1) / (count - 1)) for i in range(count)]
 
 
-def batch_extract_frames(input_dir='Videos', output_dir='Videos-Frames', extract_fps=1):
-    """
-    批量处理文件夹下的所有视频
-    """
-    # 支持的格式
-    video_extensions = ['*.mp4', '*.avi', '*.mov', '*.mkv', '*.flv', '*.wmv', '*.MP4', '*.AVI']
+def extract_single_video(video_path, save_dir, extract_fps=1, max_frames=30, overwrite=False):
+    """Stage decoded frames before replacing outputs; require explicit overwrite."""
+    if extract_fps is not None:
+        positive_number(extract_fps, "extract_fps")
+    if not isinstance(max_frames, int) or isinstance(max_frames, bool) or max_frames < 1:
+        raise ValueError("max_frames 必须为正整数")
+    source, destination = Path(video_path), Path(save_dir)
+    if not source.is_file():
+        raise FileNotFoundError(f"视频不存在: {source}")
+    destination.mkdir(parents=True, exist_ok=True)
+    old_frames = find_files(destination, IMAGE_SUFFIXES)
+    if old_frames and not overwrite:
+        raise FileExistsError(f"帧目录非空: {destination}；请使用新目录或 --overwrite")
+    import cv2
+    cap = cv2.VideoCapture(str(source))
+    try:
+        if not cap.isOpened():
+            raise ValueError(f"无法打开视频: {source}")
+        raw_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        positive_number(raw_count, "视频总帧数")
+        total_frames = int(raw_count)
+        video_fps = cap.get(cv2.CAP_PROP_FPS)
+        indices = sampling_indices(total_frames, video_fps, extract_fps, max_frames)
+        source_digest = file_digest(source)
+        with tempfile.TemporaryDirectory(prefix=".extract-", dir=destination) as staging:
+            targets, names, frame_count = set(indices), [], 0
+            while frame_count <= indices[-1]:
+                ok, frame = cap.read()
+                if not ok:
+                    raise ValueError(f"视频提前解码失败: 第{frame_count}帧，共声明{total_frames}帧")
+                if frame_count in targets:
+                    name = f"{len(names) + 1:03d}.jpg"
+                    if not cv2.imwrite(str(Path(staging) / name), frame):
+                        raise OSError(f"无法保存抽帧图片: {name}")
+                    names.append(name)
+                frame_count += 1
+            if len(names) != len(indices):
+                raise ValueError("抽帧未完成")
+            if file_digest(source) != source_digest:
+                raise ValueError("抽帧期间源视频发生变化，请重试")
+            # Deletion is confined to image files explicitly discovered in this output directory.
+            atomic_json(destination / "frames_manifest.json", {"status": "updating"})
+            if overwrite:
+                for old in old_frames:
+                    old.unlink()
+            for name in names:
+                os.replace(Path(staging) / name, destination / name)
+            manifest = {"version": 1, "status": "complete",
+                        "frame_sha256": {name: file_digest(destination / name) for name in names}, "source": str(source.resolve()), "sha256": source_digest,
+                        "total_frames": total_frames, "video_fps": video_fps,
+                        "extract_fps": extract_fps, "max_frames": max_frames,
+                        "sampled_indices": indices, "frame_files": names,
+                        "saved_count": len(names), "duration": total_frames / video_fps,
+                        "sampling": "uniform_whole_video",
+                        "interval": (indices[-1] - indices[0]) / (len(indices) - 1) if len(indices) > 1 else 0}
+            atomic_json(destination / "frames_manifest.json", manifest)
+            return manifest
+    finally:
+        cap.release()
 
-    # 1. 输入检查
-    if not os.path.exists(input_dir):
-        print(f"错误：未找到文件夹 '{input_dir}'")
-        return
 
-    # 2. 搜索视频文件
-    video_files = []
-    for ext in video_extensions:
-        video_files.extend(glob.glob(os.path.join(input_dir, ext)))
-
-    if not video_files:
-        print(f"在 '{input_dir}' 下未找到视频文件。")
-        return
-
-    print(f"--- 任务开始 --- 共发现 {len(video_files)} 个视频 ---\n")
-
-    # 创建输出根目录
-    os.makedirs(output_dir, exist_ok=True)
-
-    # 3. 遍历并调用抽帧函数
-    for video_path in video_files:
-        video_name_with_ext = os.path.basename(video_path)
-        video_name = os.path.splitext(video_name_with_ext)[0]
-
-        # ★ 关键修改：将纯数字视频名补零为4位（如 "1" -> "0001"，"120" -> "0120"）
-        # 这样后续文件夹按字符串排序时，顺序就等于数字排序
+def batch_extract_frames(input_dir=None, output_dir=None, extract_fps=1, max_frames=30, overwrite=False):
+    base = Path(__file__).parent
+    input_dir = input_dir or base / "Videos"
+    output_dir = Path(output_dir or base / "Videos-Frames")
+    if extract_fps is not None:
+        positive_number(extract_fps, "extract_fps")
+    videos = find_files(input_dir, VIDEO_SUFFIXES)
+    if not videos:
+        raise ValueError("输入目录没有视频")
+    names = [p.stem.casefold() for p in videos]
+    if len(set(names)) != len(names):
+        raise ValueError("视频文件具有相同名称，输出目录会冲突；请先重命名")
+    results = []
+    for video in videos:
         try:
-            video_name_padded = f"{int(video_name):04d}"
-        except ValueError:
-            # 如果视频名不是纯数字（如 "demo"），保持原样不做处理
-            video_name_padded = video_name
+            result = extract_single_video(video, output_dir / (video.stem + "_Frames"),
+                                          extract_fps, max_frames, overwrite)
+            results.append({"video": str(video), "status": "success", **result})
+        except (OSError, ValueError) as error:
+            results.append({"video": str(video), "status": "failed", "error": str(error)})
+    atomic_json(output_dir / "extraction_results.json", results)
+    return results
 
-        # 构建保存路径：Videos-Frames -> Video_Name_Frames
-        video_save_dir = os.path.join(output_dir, video_name_padded + "_Frames")
-        os.makedirs(video_save_dir, exist_ok=True)
 
-        print(f"正在处理: {video_name_with_ext}")
-
-        # 调用核心抽帧函数
-        start_time = time.time()
-        result = extract_single_video(video_path, video_save_dir, extract_fps)
-        end_time = time.time()
-
-        # 打印统计信息
-        if result:
-            print(f"  [信息] 原始帧率: {result['video_fps']:.2f} FPS | 时长: {result['duration']:.2f}秒")
-            print(f"  [信息] 抽帧间隔: 每 {result['interval']} 帧 | 抽帧率: {extract_fps} FPS")
-            print(f"  [完成] 保存数量: {result['saved_count']} 张 | 耗时: {end_time - start_time:.2f}秒")
-            print(f"  [路径] {video_save_dir}\n" + "-" * 50)
-        else:
-            print(f"  [失败] 无法读取视频或帧率错误。\n" + "-" * 50)
-
-    print("所有视频处理完毕！")
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="覆盖完整视频的均匀抽帧；旧帧需要显式 --overwrite")
+    parser.add_argument("--input-dir", default=None)
+    parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--extract-fps", type=float, default=1)
+    parser.add_argument("--max-frames", type=int, default=30)
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args(argv)
+    try:
+        positive_number(args.extract_fps, "extract_fps")
+        if args.max_frames < 1:
+            raise ValueError("max_frames 必须为正整数")
+        if args.dry_run:
+            videos = find_files(args.input_dir or Path(__file__).parent / "Videos", VIDEO_SUFFIXES)
+            if not videos:
+                raise ValueError("输入目录没有视频")
+            print(json.dumps([str(p) for p in videos], ensure_ascii=False))
+            return 0
+        results = batch_extract_frames(args.input_dir, args.output_dir, args.extract_fps,
+                                       args.max_frames, args.overwrite)
+        print(f"完成: {len(results)}，失败: {sum(r['status'] != 'success' for r in results)}")
+        return int(any(r["status"] != "success" for r in results))
+    except (OSError, ValueError, ImportError) as error:
+        parser.exit(1, f"错误: {error}\n")
 
 
 if __name__ == "__main__":
-    # === 参数配置 ===
-    INPUT_FOLDER = r'./Videos'
-    OUTPUT_FOLDER = r'Videos-Frames'
-    EXTRACT_FPS = 1  # 每秒抽取1帧
-
-    batch_extract_frames(INPUT_FOLDER, OUTPUT_FOLDER, EXTRACT_FPS)
+    raise SystemExit(main())

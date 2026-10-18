@@ -1,22 +1,13 @@
-from huggingface_hub import hf_hub_download
-import os
+"""Import-safe download example; run with --help for configuration."""
+try:
+    from ._download_cli import run_huggingface
+except ImportError:  # Direct script execution.
+    from _download_cli import run_huggingface
 
-# 替换为您的 Hugging Face 用户访问令牌
-HF_TOKEN = ""
 
-# 指定模型ID和文件名
-repo_id = "CompVis/stable-diffusion-v-1-4-original"
-filename = "sd-v1-4-full-ema.ckpt"
+def main(argv=None):
+    return run_huggingface("CompVis/stable-diffusion-v-1-4-original", filename="sd-v1-4-full-ema.ckpt", argv=argv)
 
-print(f"正在下载 {filename}...")
 
-# 使用 hf_hub_download 函数下载文件
-# use_auth_token 参数用于身份验证
-downloaded_model_path = hf_hub_download(
-    repo_id=repo_id,
-    filename=filename,
-    token=HF_TOKEN,
-    local_dir="" # 可选：指定下载到的本地目录
-)
-
-print(f"模型已成功下载到: {os.path.abspath(downloaded_model_path)}")
+if __name__ == "__main__":
+    main()

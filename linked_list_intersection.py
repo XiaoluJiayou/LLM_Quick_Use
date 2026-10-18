@@ -246,11 +246,11 @@ def run_tests():
         test_count = test_count + 1
         if actual is expected:
             passed_count = passed_count + 1
-            print(f"  ✓ {test_name}")
+            print(f"  [PASS] {test_name}")
         else:
             actual_val = actual.value if actual is not None else "None"
             expected_val = expected.value if expected is not None else "None"
-            print(f"  ✗ {test_name} — 实际: {actual_val}, 期望: {expected_val}")
+            print(f"  [FAIL] {test_name} — 实际: {actual_val}, 期望: {expected_val}")
 
     print("=" * 60)
     print("测试：链表相交判断")
@@ -271,8 +271,10 @@ def run_tests():
 
     result1 = get_intersection_node_two_pointers(head_a, head_b)
     result2 = get_intersection_node_hashset(head_a, head_b)
+    result3 = get_intersection_node_length_based(head_a, head_b)
     assert_equal(result1, intersect_head, "双指针法 - 正常相交")
     assert_equal(result2, intersect_head, "HashSet 法 - 正常相交")
+    assert_equal(result3, intersect_head, "长度对齐法 - 正常相交")
 
     # ------------------------------------------------------------------
     # 测试 2：不相交
@@ -285,8 +287,10 @@ def run_tests():
 
     result1 = get_intersection_node_two_pointers(head_a, head_b)
     result2 = get_intersection_node_hashset(head_a, head_b)
+    result3 = get_intersection_node_length_based(head_a, head_b)
     assert_equal(result1, None, "双指针法 - 不相交")
     assert_equal(result2, None, "HashSet 法 - 不相交")
+    assert_equal(result3, None, "长度对齐法 - 不相交")
 
     # ------------------------------------------------------------------
     # 测试 3：一个链表为空
@@ -299,8 +303,10 @@ def run_tests():
 
     result1 = get_intersection_node_two_pointers(head_a, head_b)
     result2 = get_intersection_node_hashset(head_a, head_b)
+    result3 = get_intersection_node_length_based(head_a, head_b)
     assert_equal(result1, None, "双指针法 - 链表 B 为空")
     assert_equal(result2, None, "HashSet 法 - 链表 B 为空")
+    assert_equal(result3, None, "长度对齐法 - 链表 B 为空")
 
     # ------------------------------------------------------------------
     # 测试 4：从头节点开始相交（其中一个链表完全包含在另一个中）
@@ -317,8 +323,10 @@ def run_tests():
 
     result1 = get_intersection_node_two_pointers(head_a, head_b)
     result2 = get_intersection_node_hashset(head_a, head_b)
+    result3 = get_intersection_node_length_based(head_a, head_b)
     assert_equal(result1, intersect_head, "双指针法 - 从头相交")
     assert_equal(result2, intersect_head, "HashSet 法 - 从头相交")
+    assert_equal(result3, intersect_head, "长度对齐法 - 从头相交")
 
     # ------------------------------------------------------------------
     # 测试 5：两个链表完全相同
@@ -332,8 +340,10 @@ def run_tests():
 
     result1 = get_intersection_node_two_pointers(head_a, head_b)
     result2 = get_intersection_node_hashset(head_a, head_b)
+    result3 = get_intersection_node_length_based(head_a, head_b)
     assert_equal(result1, head_a, "双指针法 - 两链表相同")
     assert_equal(result2, head_a, "HashSet 法 - 两链表相同")
+    assert_equal(result3, head_a, "长度对齐法 - 两链表相同")
 
     # ------------------------------------------------------------------
     # 测试 6：相交在最后一个节点
@@ -350,8 +360,10 @@ def run_tests():
 
     result1 = get_intersection_node_two_pointers(head_a, head_b)
     result2 = get_intersection_node_hashset(head_a, head_b)
+    result3 = get_intersection_node_length_based(head_a, head_b)
     assert_equal(result1, intersect_head, "双指针法 - 尾节点相交")
     assert_equal(result2, intersect_head, "HashSet 法 - 尾节点相交")
+    assert_equal(result3, intersect_head, "长度对齐法 - 尾节点相交")
 
     # ------------------------------------------------------------------
     # 测试 7：两个链表都为空
@@ -359,8 +371,10 @@ def run_tests():
     print("\n【测试组 7】两个链表都为空")
     result1 = get_intersection_node_two_pointers(None, None)
     result2 = get_intersection_node_hashset(None, None)
+    result3 = get_intersection_node_length_based(None, None)
     assert_equal(result1, None, "双指针法 - 两链表都为空")
     assert_equal(result2, None, "HashSet 法 - 两链表都为空")
+    assert_equal(result3, None, "长度对齐法 - 两链表都为空")
 
     # ------------------------------------------------------------------
     # 测试总结
@@ -372,10 +386,11 @@ def run_tests():
     else:
         print(f"有 {test_count - passed_count} 个测试未通过，请检查代码。")
     print(f"{'=' * 60}")
+    return passed_count == test_count
 
 
 
 
 
 if __name__ == "__main__":
-    run_tests()
+    raise SystemExit(0 if run_tests() else 1)

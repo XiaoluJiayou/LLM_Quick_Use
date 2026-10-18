@@ -1,12 +1,14 @@
-from PIL import Image
-import torch
-from transformers import ChineseCLIPProcessor, ChineseCLIPModel
+"""ChineseCLIP prompt-ensemble image matching demo."""
+import argparse
+from pathlib import Path
+
+from llm_quick_use.clip import extract_features, load_clip, normalize_features
 
 
 # ========================== 配置区（只需修改这里） ==========================
 
 # 模型路径
-MODEL_PATH = "/root/autodl-tmp/chinese-clip-vit-base-patch16"
+MODEL_PATH = None
 
 # CLIP标准提示模板（中文最优格式，可根据需求微调）
 CLIP_TEMPLATE = "一张展示{}的照片"
@@ -48,29 +50,12 @@ def apply_template_to_prompts(prompts, template):
     return [template.format(p) for p in prompts]
 
 
-def normalize_features(features):
-    """对特征向量进行 L2 归一化"""
-    return features / features.norm(p=2, dim=-1, keepdim=True)
-
-
 def extract_text_features(texts, model, processor):
-    """提取文本特征并归一化"""
-    inputs = processor(text=texts, padding=True, truncation=True, return_tensors="pt")
-    with torch.no_grad():
-        features = model.get_text_features(**inputs)
-    if hasattr(features, "pooler_output"):
-        features = features.pooler_output
-    return normalize_features(features)
+    return extract_features(model, processor, texts=texts)
 
 
 def extract_image_features(image, model, processor):
-    """提取图像特征并归一化"""
-    inputs = processor(images=image, return_tensors="pt")
-    with torch.no_grad():
-        features = model.get_image_features(**inputs)
-    if hasattr(features, "pooler_output"):
-        features = features.pooler_output
-    return normalize_features(features)
+    return extract_features(model, processor, images=image)
 
 
 def classify_image(image_path, class_prompts, model, processor, template=CLIP_TEMPLATE):
@@ -79,13 +64,19 @@ def classify_image(image_path, class_prompts, model, processor, template=CLIP_TE
     :return: {类别名: 概率值(0~1)，所有类别概率之和为1}
     """
     # 1. 加载图像
-    image = Image.open(image_path)
+    import torch
+    from PIL import Image
+    if not class_prompts or any(not prompts or any(not isinstance(p, str) or not p.strip() for p in prompts)
+                                for prompts in class_prompts.values()):
+        raise ValueError("Every class must contain at least one nonempty text prompt")
+    with Image.open(image_path) as source:
+        image = source.convert("RGB")
 
     # 2. 提取图像特征
     image_feat = extract_image_features(image, model, processor)  # (1, D)
 
     # 3. 获取模型学习到的 logit_scale（关键！CLIP训练时学到的温度参数）
-    logit_scale = model.logit_scale.exp()  # exp(logit_scale)，典型值 ~100
+    logit_scale = model.logit_scale.detach().exp()  # exp(logit_scale)，典型值 ~100
 
     # 4. 计算每个类别的聚合相似度（相似度平均，而非特征平均）
     class_names = list(class_prompts.keys())
@@ -135,19 +126,21 @@ def print_results(results):
 
 # ========================== 主程序区 ==========================
 
-def main():
-    # 加载模型
-    print("正在加载模型...")
-    model = ChineseCLIPModel.from_pretrained(MODEL_PATH)
-    processor = ChineseCLIPProcessor.from_pretrained(MODEL_PATH)
-
-    # 执行分类
-    results = classify_image(IMAGE_PATH, CLASS_PROMPTS, model, processor)
-
-    # 打印结果
-    print_results(results)
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model", required=True)
+    parser.add_argument("--image", type=Path, required=True)
+    parser.add_argument("--device")
+    parser.add_argument("--template", default=CLIP_TEMPLATE)
+    parser.add_argument("--local-files-only", action="store_true")
+    args = parser.parse_args(argv)
+    if not args.image.is_file():
+        parser.error("Image does not exist: {}".format(args.image))
+    model, processor = load_clip(args.model, args.device, args.local_files_only)
+    print_results(classify_image(args.image, CLASS_PROMPTS, model, processor, args.template))
+    print("Scores are relative to candidate prompts; calibrate against labeled data before safety use.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
-
+    raise SystemExit(main())

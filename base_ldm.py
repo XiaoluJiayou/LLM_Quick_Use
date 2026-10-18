@@ -2,9 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-import numpy as np
 
 # 设备配置
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -17,10 +15,12 @@ timesteps = 1000 # 扩散步数
 batch_size = 64
 epochs = 10
 
-# 数据加载 (MNIST)
-transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+def create_train_loader(data_dir="./data", batch_size=batch_size, download=False):
+    """Dataset I/O is explicit; importing this module never downloads data."""
+    from torchvision import datasets, transforms
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+    dataset = datasets.MNIST(root=data_dir, train=True, transform=transform, download=download)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # 自动编码器定义
 class Autoencoder(nn.Module):
@@ -57,7 +57,7 @@ class SimpleUNet(nn.Module):
             nn.ReLU()
         )
         self.up = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),  # [batch, 32, 7, 7]
+            nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1),  # [batch, 32, 7, 7]
             nn.ReLU(),
             nn.Conv2d(32, latent_dim, 3, padding=1)
         )
@@ -102,7 +102,7 @@ class Diffusion:
         return posterior_mean
 
 # 训练自动编码器
-def train_autoencoder(ae, optimizer, epochs=5):
+def train_autoencoder(ae, optimizer, train_loader, epochs=5):
     ae.train()
     for epoch in range(epochs):
         for batch_idx, (data, _) in enumerate(train_loader):
@@ -116,7 +116,7 @@ def train_autoencoder(ae, optimizer, epochs=5):
                 print(f"AE Epoch [{epoch}/{epochs}], Loss: {loss.item():.4f}")
 
 # 训练 LDM
-def train_ldm(ae, unet, diffusion, optimizer, epochs=epochs):
+def train_ldm(ae, unet, diffusion, optimizer, train_loader, epochs=epochs):
     unet.train()
     ae.eval()  # 固定自动编码器
     for epoch in range(epochs):
@@ -124,7 +124,7 @@ def train_ldm(ae, unet, diffusion, optimizer, epochs=epochs):
             data = data.to(device)
             with torch.no_grad():
                 _, z = ae(data)  # 获取潜在表示
-            t = torch.randint(0, timesteps, (data.size(0),), device=device)
+            t = torch.randint(0, diffusion.timesteps, (data.size(0),), device=device)
             z_noisy, noise = diffusion.q_sample(z, t)
             optimizer.zero_grad()
             noise_pred = unet(z_noisy, t)
@@ -140,40 +140,55 @@ def sample_ldm(ae, unet, diffusion, n_samples=16):
     ae.eval()
     with torch.no_grad():
         x = torch.randn(n_samples, latent_dim, 7, 7).to(device)  # 从噪声开始
-        for t in reversed(range(timesteps)):
+        for t in reversed(range(diffusion.timesteps)):
             x = diffusion.p_sample(unet, x, t)
         images = ae.decoder(x)
     return images
 
-# 主程序
-if __name__ == "__main__":
-    # 初始化模型
-    ae = Autoencoder().to(device)
-    unet = SimpleUNet().to(device)
+def main(argv=None):
+    import argparse
+    global device, timesteps
+    parser = argparse.ArgumentParser(description="Educational MNIST latent diffusion demo")
+    parser.add_argument("--data-dir", default="./data")
+    parser.add_argument("--download", action="store_true")
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--ae-epochs", type=int, default=5)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--timesteps", type=int, default=1000)
+    parser.add_argument("--device", default=str(device))
+    parser.add_argument("--smoke-test", action="store_true", help="Synthetic forward/backward, no dataset or download")
+    parser.add_argument("--no-show", action="store_true")
+    args = parser.parse_args(argv)
+    if min(args.epochs, args.ae_epochs, args.batch_size, args.timesteps) < 1:
+        parser.error("epoch counts, batch-size and timesteps must be positive")
+    device, timesteps = torch.device(args.device), args.timesteps
+    torch.manual_seed(0)
+    ae, unet = Autoencoder().to(device), SimpleUNet().to(device)
     diffusion = Diffusion(timesteps)
+    if args.smoke_test:
+        data = torch.randn(2, channels, image_size, image_size, device=device)
+        recon, z = ae(data)
+        t = torch.zeros(2, dtype=torch.long, device=device)
+        noisy, noise = diffusion.q_sample(z.detach(), t)
+        prediction = unet(noisy, t)
+        assert prediction.shape == noise.shape
+        (F.mse_loss(prediction, noise) + F.mse_loss(recon, data)).backward()
+        print("OK: reconstruction={}, denoiser={}".format(tuple(recon.shape), tuple(prediction.shape)))
+        return 0
+    loader = create_train_loader(args.data_dir, args.batch_size, args.download)
+    train_autoencoder(ae, optim.Adam(ae.parameters(), lr=1e-3), loader, epochs=args.ae_epochs)
+    train_ldm(ae, unet, diffusion, optim.Adam(unet.parameters(), lr=1e-4), loader, epochs=args.epochs)
+    samples = sample_ldm(ae, unet, diffusion).cpu().numpy()
+    print("Sample shape:", samples.shape)
+    if not args.no_show:
+        import matplotlib.pyplot as plt
+        _, axes = plt.subplots(4, 4, figsize=(8, 8))
+        for i, ax in enumerate(axes.flat):
+            ax.imshow(samples[i, 0], cmap="gray")
+            ax.axis("off")
+        plt.show()
+    return 0
 
-    # 优化器
-    ae_optimizer = optim.Adam(ae.parameters(), lr=1e-3)
-    unet_optimizer = optim.Adam(unet.parameters(), lr=1e-4)
 
-    # 训练自动编码器
-    print("Training Autoencoder...")
-    train_autoencoder(ae, ae_optimizer)
-
-    # 训练 LDM
-    print("Training Latent Diffusion Model...")
-    train_ldm(ae, unet, diffusion, unet_optimizer)
-
-    # 生成样本
-    print("Generating Samples...")
-    samples = sample_ldm(ae, unet, diffusion)
-    samples = samples.cpu().numpy()
-    print("Sample shape:", samples.shape)  # [16, 1, 28, 28]
-
-    # 可视化（可选，使用 matplotlib）
-    import matplotlib.pyplot as plt
-    fig, axes = plt.subplots(4, 4, figsize=(8, 8))
-    for i, ax in enumerate(axes.flat):
-        ax.imshow(samples[i, 0], cmap='gray')
-        ax.axis('off')
-    plt.show()
+if __name__ == "__main__":
+    raise SystemExit(main())

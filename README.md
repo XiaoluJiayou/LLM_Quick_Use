@@ -1,93 +1,109 @@
-# Llm Quick Use
+# LLM Quick Use
 
+面向模型实验、数据准备与内容安全评测的工具集合。保留各模型原有目录，公共工具提供配置化命令行、结构化结果、可恢复写出和离线验证。
 
+本轮优化方案与实施记录见 [优化计划](docs/OPTIMIZATION_PLAN.md)，覆盖范围和实测结果见 [验收报告](docs/OPTIMIZATION_REPORT.md)。模型效果、云服务权限和 GPU 性能需在目标环境验收；离线测试使用模拟服务或随机小张量。
 
-## Getting started
+## 安装与环境
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+推荐 Python 3.10+。先创建独立环境，安装公共包；按任务选择依赖组：
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin http://10.1.17.165/luyr12/llm_quick_use.git
-git branch -M main
-git push -uf origin main
+```powershell
+python -m venv .venv
+.venv/Scripts/python -m pip install -e "."
+.venv/Scripts/python -m pip install -e ".[data,test]"
 ```
 
-## Integrate with your tools
+Linux 激活方式为 `source .venv/bin/activate`，Windows PowerShell 可用 `.venv/Scripts/Activate.ps1`。下文 `python` 指已选择的项目环境。
 
-- [ ] [Set up project integrations](http://10.1.17.165/luyr12/llm_quick_use/-/settings/integrations)
+| 依赖组 | 用途 |
+| --- | --- |
+| `data` | pandas、YAML、Excel、进度显示；CSV 合并与抽样本身只需标准库 |
+| `api` | SDK 转换流程及 requests 云示例；公共 ChatClient 本身只用标准库 |
+| `download` / `modelscope` | 分别安装 Hugging Face / ModelScope 下载 SDK |
+| `clip` | ChineseCLIP 实验 |
+| `train` | 教学 LDM、MNIST 与感知损失实验 |
+| `video` | OpenCV 抽帧及媒体工具 |
+| `qwen-vl` | Qwen3-VL 截图评估；需匹配权重与库版本 |
+| `test` | 不下载模型的公共回归依赖；张量测试有 torch 时执行 |
 
-## Collaborate with your team
+例如 `python -m pip install -e ".[api,data]"`。GPU 环境先按设备 CUDA 版本安装匹配的 torch/torchvision，再安装任务依赖。Wan、LTX、Helios、LongCat、Janus、UniT2IXL 使用各自官方实现和独立环境；它们的专用代码不随本项目安装。Qwen-Image-2.1 / SingGuard 的版本要求见其[专门说明](text_to_image_generate_safety_evaluate/jade_qwen_singguard/README.md)。
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+`.env.example` 列出环境变量名，脚本读取当前进程环境；不会自动加载 `.env`。不要将凭据直接写进源码或命令行。生成文件建议放 `outputs/`、`results/`，下载权重放 `downloads/`，这些目录已忽略；原先已跟踪的样例媒体仍保留。
 
-## Test and Deploy
+## 项目导航
 
-Use the built-in continuous integration in GitLab.
+| 模块 | 功能与入口 |
+| --- | --- |
+| [model_dataset_download](model_dataset_download/README.md) | 模型、数据集和单文件显式下载；支持无联网预览 |
+| [data_generate](data_generate/README.md) | 随机/分层流式抽样、问题生成 Notebook |
+| `csv_file_merge.py` | 流式合并 CSV，排除输出文件，检查列名 |
+| [en_dataset_to_zh_dataset](en_dataset_to_zh_dataset/README.md) | 数据翻译和类别映射，支持指纹续跑和独立小样输出 |
+| `model_response_generate` / `model_answer_safe_eval` | OpenAI 兼容聊天接口的批量回答与回答安全评估 |
+| `batch_pretrain_data_processing_test.py` | 预训练语料的范围筛选与安全标注 |
+| `OpenClip-Chinese-Project` | 单图、敏感词匹配及按批图片分类 |
+| `base_ldm.py` / `full_ldm_unet.py` / `full_ldm_encode_decode.py` | 教学 LDM 与自编码器，支持无需数据的小张量检查 |
+| [Text_and_Image_to_video_evaluate](Text_and_Image_to_video_evaluate/README.md) | 视频后端入口、全视频抽帧、截图评估与 Base64 工具 |
+| [video-content-safety-evaluate](video-content-safety-evaluate/README.md) | 阿里云、百度视频审核的显式调用示例 |
+| [JADE + Qwen + SingGuard](text_to_image_generate_safety_evaluate/jade_qwen_singguard/README.md) | 带来源校验的文生图安全评测 |
+| `text_to_image_generate_safety_evaluate/*.ipynb` | Janus、UniT2IXL、LlavaGuard 探索示例；按实际数据长度执行 |
+| `main.py` / `leetcode.py` / `linked_list_intersection.py` / `video-content-safety-evaluate/prim_test.py` | 独立学习示例 |
+| `llm_quick_use` / `tools` / `tests` | 公共工具、项目检查和离线回归 |
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+`text_to_image_generate_safety_evaluate/package.json` 的内容是历史 Docker daemon 配置示例，不是 Node.js 依赖清单，不用于安装前端项目。使用镜像配置前请自行核实来源与可用性。
 
-***
+## 数据处理示例
 
-# Editing this README
+在项目根目录执行，先 `--help` 查看参数：
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+```powershell
+python data_generate/data_random_sample.py --input source.csv --output outputs/sample.csv --count 100 --seed 42
+python data_generate/large-scale_data_random_sample.py --input source.csv --output outputs/stratified.csv --count 100 --category-column 一级领域 --seed 42
+python csv_file_merge.py --input-dir csv_parts --output outputs/merged.csv
+python model_dataset_download/model_download_huggingface.py --repo-id openai-community/gpt2 --local-dir downloads/gpt2 --dry-run
+```
 
-## Suggestions for a good README
+抽样使用 reservoir，内存随样本量增长，不随完整 CSV 行数增长。分层抽样包含空分类并精确分配总量。现有输出需显式 `--overwrite`，输出不能覆盖输入；CSV 合并默认要求相同列名，可用 `--allow-schema-union` 明确取并集。
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+## 文本回答与安全评估
 
-## Name
-Choose a self-explaining name for your project.
+公共批处理的 `LLM_BASE_URL` / `--endpoint` 是**完整聊天补全端点**，例如自建服务的 `http://127.0.0.1:8000/v1/chat/completions`。`LLM_MODEL` 是部署模型名；鉴权来自 `LLM_API_KEY`。
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+```powershell
+python model_response_generate/batch_model_response_generate.py --input prompts.csv --output outputs/answers.csv --endpoint http://127.0.0.1:8000/v1/chat/completions --model deployed-model --dry-run
+python model_response_generate/batch_model_response_generate.py --input prompts.csv --output outputs/answers.csv --endpoint http://127.0.0.1:8000/v1/chat/completions --model deployed-model
+python model_answer_safe_eval/batch_model_response_safe_eval.py --input outputs/answers.csv --output outputs/judged.csv --endpoint http://127.0.0.1:8000/v1/chat/completions --model judge-model
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+标准输入提示词列是 `Prompts`，可用 `--prompt-column` 改名。`api_batch_prompt_answer_generate.py` 保留 `Prompt` → `Answers` 的旧列契约；标准批量生成使用 `Responses`，裁判默认读取 `Responses` 并写 `Safety_Eval_Results`。使用不同列名时用 `--response-column` 显式指定。原始 ID 和标签列保留。
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+每条结果写入 `<output>.jsonl`，输出 CSV 通过原子替换生成，元数据写入 `<output>.meta.json`。相同来源下成功行跳过，失败行重试；来源/模型/参数改变需新输出路径。`status` 区分 `ok`、`error`、`skipped`，上游失败不会当成正常回答进入裁判。裁判仅接受完整 `Safe` / `UnSafe`。失败或跳过任务使命令非零退出。
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+`--timeout` 限制请求时间，`--max-attempts` 控制有界重试；计费服务可设置 `--max-attempts 1`。重试不提供服务端幂等保证。转换模块保留其 `OPENAI_BASE_URL` / `OPENAI_MODEL` / `OPENAI_API_KEY` 变量，详见模块说明；其 BASE_URL 为 SDK 服务根地址，与上述完整端点的语义不同。
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+## 图像、视频与训练
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```powershell
+python OpenClip-Chinese-Project/quick_start.py --model models/ChineseCLIP --image example.jpg --local-files-only
+python base_ldm.py --smoke-test --device cpu
+python full_ldm_unet.py --smoke-test --device cpu
+python full_ldm_encode_decode.py --smoke-test --device cpu
+python Text_and_Image_to_video_evaluate/batch_videos_frame_extract.py --input-dir videos --dry-run
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+LDM 的 `--smoke-test` 使用随机小张量，不下载 MNIST 或 VGG；完整训练才需要数据和预训练权重。CLIP 阈值属于实验参数，需要带标注验证集校准。抽帧和视频后端的参数、输入 JSON 与实际支持范围见[视频模块说明](Text_and_Image_to_video_evaluate/README.md)；云审核受理成功与最终审核结论需分别解释。
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+Notebook 需按单元顺序运行。图片生成在加载权重前规范化 ID 并检查重名、空提示词与种子范围；数据生成使用完整 JSON 解码，拒绝覆盖已损坏结果。Notebook 是探索入口，不提供生产评测完整的实验来源与自动续跑；正式文生图评测使用 JADE 目录。
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+## 验证与迁移
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```powershell
+python tools/check_project.py
+python tools/run_checks.py
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+检查工具只读取全部 Python 与 Notebook 代码，不导入或执行实验。凭据检查只报告位置，不回显值；它是轻量检查，不能保证识别所有凭据。`run_checks.py` 将公共测试与 JADE 既有回归放在独立进程运行，避免同名模块互相污染。可用 `--json-output docs/code_inventory.json` 保存静态文件清单。
 
-## License
-For open source projects, say how it is licensed.
+原先自动执行、依赖绝对路径的脚本现在改为显式参数入口，旧的无参启动方式需按 `--help` 更新。旧输出缺来源元数据、输入或配置变更时，使用新输出目录。不要让多个任务同时写同一结果路径。已存在的 JADE 管线和本地学习文件保持独立。
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+真实环境验收须记录：Python/依赖版本、模型 revision、输入数据摘要、GPU/CUDA、随机种子、完成/失败数量、总耗时及显存峰值。先用小样本检查图片/视频、原始回答和统计分母，再开展完整实验；并发、量化与编译加速在此基线上测量后逐项引入。

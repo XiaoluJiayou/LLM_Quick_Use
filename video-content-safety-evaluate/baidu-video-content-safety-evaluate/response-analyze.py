@@ -1,73 +1,65 @@
-import requests
+"""Inspect HTTP metadata while masking request credentials and URL query values."""
+import argparse
+import json
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+
+SENSITIVE = {"authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "api-key"}
+
+
+def sanitized_url(value):
+    parts = urlsplit(value)
+    host = parts.hostname or ""
+    if parts.port:
+        host += ":" + str(parts.port)
+    query = urlencode([(key, "[REDACTED]") for key, _ in parse_qsl(parts.query, keep_blank_values=True)])
+    return urlunsplit((parts.scheme, host, parts.path, query, ""))
 
 
 def analyze_response(response):
-    """完整分析响应对象"""
-
-    # 1. 基本状态信息
-    print("=== 基本状态 ===")
-    print(f"状态码: {response.status_code}")
-    print(f"状态描述: {response.reason}")
-    print(f"请求是否成功: {response.ok}")
-    print(f"耗时: {response.elapsed}")
-
-    # 2. URL和重定向信息
-    print("\n=== URL信息 ===")
-    print(f"最终URL: {response.url}")
-    print(f"重定向历史: {len(response.history)} 次")
-    for i, resp in enumerate(response.history):
-        print(f"  重定向 {i + 1}: {resp.status_code} -> {resp.url}")
-
-    # 3. 头部信息
-    print("\n=== 响应头 ===")
-    for key, value in response.headers.items():
-        print(f"{key}: {value}")
-
-    # 4. 内容信息
-    print("\n=== 内容信息 ===")
-    print(f"编码: {response.encoding}")
-    print(f"内容长度: {len(response.content)} 字节")
-    print(f"文本预览: {response.text[:200]}...")
-
-    # 5. 尝试解析JSON
+    summary = {"status_code": response.status_code, "ok": response.ok,
+               "url": sanitized_url(response.url), "content_length": len(response.content),
+               "redirect_count": len(response.history),
+               "response_headers": {k: "[REDACTED]" if k.lower() in SENSITIVE else v
+                                    for k, v in response.headers.items()}}
+    request = getattr(response, "request", None)
+    if request:
+        summary["request_method"] = request.method
+        summary["request_headers"] = {k: "[REDACTED]" if k.lower() in SENSITIVE else v
+                                      for k, v in request.headers.items()}
     try:
-        json_data = response.json()
-        print("\n=== JSON数据 ===")
-        print(f"JSON类型: {type(json_data)}")
-
-        # 如果有conclusion字段
-        if "conclusion" in json_data:
-            print(f"结论: {json_data['conclusion']}")
-
-        # 打印所有键
-        print(f"JSON键: {list(json_data.keys())}")
+        body = response.json()
+        summary["json_type"] = type(body).__name__
+        if isinstance(body, dict):
+            summary["json_keys"] = list(body)
+            if "conclusion" in body:
+                summary["conclusion"] = body["conclusion"]
     except ValueError:
-        print("响应不是有效的JSON格式")
-
-    # 6. 请求信息
-    print("\n=== 原始请求信息 ===")
-    print(f"请求方法: {response.request.method}")
-    print(f"请求头: {dict(response.request.headers)}")
-    if response.request.body:
-        print(f"请求体长度: {len(response.request.body)} 字节")
+        summary["json_type"] = "invalid"
+    # Never dump bodies: auth endpoints may return tokens even without an error.
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return summary
 
 
-# 使用示例
-def main():
-    url = "https://aip.baidubce.com/rest/2.0/solution/v1/video_censor/v2/user_defined"
-    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-    payload = 'extId=123&name=test&videoUrl=http://example.com/video.mp4'
-
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="检查显式指定URL的响应元数据，不打印鉴权信息或响应正文")
+    parser.add_argument("--url", required=True)
+    parser.add_argument("--timeout", type=float, default=10)
+    args = parser.parse_args(argv)
+    import math
+    if not math.isfinite(args.timeout) or args.timeout <= 0:
+        parser.error("timeout 必须为有限正数")
+    parts = urlsplit(args.url)
+    if parts.scheme not in {"http", "https"} or not parts.hostname or parts.username or parts.password:
+        parser.error("url 必须为HTTP/HTTPS地址且不含用户凭据")
     try:
-        response = requests.request("POST", url, headers=headers, data=payload.encode("utf-8"))
-        response.encoding = "utf-8"
+        import requests
+        with requests.Session() as session:
+            response = session.get(args.url, timeout=(min(5, args.timeout), args.timeout))
+            analyze_response(response)
+            return int(not response.ok)
+    except Exception as error:
+        parser.exit(1, f"请求失败 ({type(error).__name__})\n")
 
-        # 完整分析响应
-        analyze_response(response)
 
-    except requests.exceptions.RequestException as e:
-        print(f"请求异常: {e}")
-
-
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    raise SystemExit(main())

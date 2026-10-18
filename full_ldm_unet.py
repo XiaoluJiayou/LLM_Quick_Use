@@ -2,9 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-import numpy as np
 
 # 设备配置
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -18,10 +16,12 @@ batch_size = 64
 epochs = 10
 num_classes = 10  # MNIST 类别数
 
-# 数据加载 (MNIST)
-transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+def create_train_loader(data_dir="./data", batch_size=batch_size, download=False):
+    """Dataset I/O is explicit; importing this module never downloads data."""
+    from torchvision import datasets, transforms
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+    dataset = datasets.MNIST(root=data_dir, train=True, transform=transform, download=download)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # 跨注意力模块
 class CrossAttention(nn.Module):
@@ -75,7 +75,7 @@ class ConditionalUNet(nn.Module):
         self.context_embed = nn.Embedding(num_classes, 64)  # 条件编码器 tau_theta
         self.attn = CrossAttention(query_dim=64, context_dim=64)
         self.up = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),  # [batch, 32, 7, 7]
+            nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1),  # [batch, 32, 7, 7]
             nn.ReLU(),
             nn.Conv2d(32, latent_dim, 3, padding=1)
         )
@@ -86,7 +86,7 @@ class ConditionalUNet(nn.Module):
 
         x = self.down(x)  # [batch, 64, 4, 4]
         x = x + t_emb  # 注入时间条件
-        x = self.attn(x, y_emb.unsqueeze(1))  # 跨注意力融合条件信息
+        x = x + self.attn(x, y_emb.unsqueeze(1))  # 跨注意力融合条件信息
         x = self.up(x)
         return x
 
@@ -140,7 +140,7 @@ class Diffusion:
         return posterior_mean
 
 # 训练函数
-def train_ldm(ae, unet, diffusion, optimizer):
+def train_ldm(ae, unet, diffusion, optimizer, train_loader, epochs=epochs):
     unet.train()
     ae.eval()
     for epoch in range(epochs):
@@ -148,7 +148,7 @@ def train_ldm(ae, unet, diffusion, optimizer):
             data, labels = data.to(device), labels.to(device)
             with torch.no_grad():
                 _, z = ae(data)
-            t = torch.randint(0, timesteps, (data.size(0),), device=device)
+            t = torch.randint(0, diffusion.timesteps, (data.size(0),), device=device)
             z_noisy, noise = diffusion.q_sample(z, t)
             optimizer.zero_grad()
             noise_pred = unet(z_noisy, t, labels)
@@ -164,47 +164,70 @@ def sample_ldm(ae, unet, diffusion, y, n_samples=16):
     ae.eval()
     with torch.no_grad():
         x = torch.randn(n_samples, latent_dim, 7, 7).to(device)
-        y = y.repeat(n_samples).to(device)  # 重复条件
-        for t in reversed(range(timesteps)):
+        y = torch.as_tensor(y, dtype=torch.long, device=device).reshape(-1)
+        if y.numel() == 1:
+            y = y.repeat(n_samples)
+        if y.numel() != n_samples or bool(((y < 0) | (y >= num_classes)).any()):
+            raise ValueError("Provide one class label or one valid class label per sample")
+        for t in reversed(range(diffusion.timesteps)):
             x = diffusion.p_sample(unet, x, t, y)
         images = ae.decoder(x)
     return images
 
-# 主程序
-if __name__ == "__main__":
-    # 初始化模型
-    ae = Autoencoder().to(device)
-    unet = ConditionalUNet().to(device)
+def main(argv=None):
+    import argparse
+    global device, timesteps
+    parser = argparse.ArgumentParser(description="Educational conditional MNIST latent diffusion demo")
+    parser.add_argument("--data-dir", default="./data")
+    parser.add_argument("--download", action="store_true")
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--ae-epochs", type=int, default=5)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--timesteps", type=int, default=1000)
+    parser.add_argument("--class-label", type=int, default=5)
+    parser.add_argument("--device", default=str(device))
+    parser.add_argument("--smoke-test", action="store_true", help="Synthetic forward/backward, no dataset or download")
+    parser.add_argument("--no-show", action="store_true")
+    args = parser.parse_args(argv)
+    if min(args.epochs, args.ae_epochs, args.batch_size, args.timesteps) < 1 or not 0 <= args.class_label < num_classes:
+        parser.error("Counts must be positive and class-label must be 0..9")
+    device, timesteps = torch.device(args.device), args.timesteps
+    torch.manual_seed(0)
+    ae, unet = Autoencoder().to(device), ConditionalUNet().to(device)
     diffusion = Diffusion(timesteps)
-
-    # 优化器
+    if args.smoke_test:
+        data = torch.randn(2, channels, image_size, image_size, device=device)
+        recon, z = ae(data)
+        t = torch.zeros(2, dtype=torch.long, device=device)
+        labels = torch.tensor([1, 2], dtype=torch.long, device=device)
+        noisy, noise = diffusion.q_sample(z.detach(), t)
+        prediction = unet(noisy, t, labels)
+        assert prediction.shape == noise.shape
+        (F.mse_loss(prediction, noise) + F.mse_loss(recon, data)).backward()
+        print("OK: reconstruction={}, conditional_denoiser={}".format(tuple(recon.shape), tuple(prediction.shape)))
+        return 0
+    loader = create_train_loader(args.data_dir, args.batch_size, args.download)
     ae_optimizer = optim.Adam(ae.parameters(), lr=1e-3)
-    unet_optimizer = optim.Adam(unet.parameters(), lr=1e-4)
-
-    # 预训练自动编码器（简化）
     ae.train()
-    for epoch in range(5):
-        for data, _ in train_loader:
+    for _ in range(args.ae_epochs):
+        for data, _ in loader:
             data = data.to(device)
             ae_optimizer.zero_grad()
             recon, _ = ae(data)
-            loss = F.mse_loss(recon, data)
-            loss.backward()
+            F.mse_loss(recon, data).backward()
             ae_optimizer.step()
+    train_ldm(ae, unet, diffusion, optim.Adam(unet.parameters(), lr=1e-4), loader, epochs=args.epochs)
+    samples = sample_ldm(ae, unet, diffusion, args.class_label).cpu().numpy()
+    print("Sample shape:", samples.shape)
+    if not args.no_show:
+        import matplotlib.pyplot as plt
+        _, axes = plt.subplots(4, 4, figsize=(8, 8))
+        for i, ax in enumerate(axes.flat):
+            ax.imshow(samples[i, 0], cmap="gray")
+            ax.axis("off")
+        plt.show()
+    return 0
 
-    # 训练 LDM
-    print("Training Conditional Latent Diffusion Model...")
-    train_ldm(ae, unet, diffusion, unet_optimizer)
 
-    # 生成样本（例如生成数字 5）
-    print("Generating Samples for class 5...")
-    samples = sample_ldm(ae, unet, diffusion, torch.tensor([5]))
-    samples = samples.cpu().numpy()
-
-    # 可视化
-    import matplotlib.pyplot as plt
-    fig, axes = plt.subplots(4, 4, figsize=(8, 8))
-    for i, ax in enumerate(axes.flat):
-        ax.imshow(samples[i, 0], cmap='gray')
-        ax.axis('off')
-    plt.show()
+if __name__ == "__main__":
+    raise SystemExit(main())
