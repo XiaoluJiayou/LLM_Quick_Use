@@ -1,7 +1,7 @@
-# torch 用 AutoDL 镜像自带的版本。
-# diffusers 需要 GitHub 上的最新版才有 QwenImage21Pipeline，单独安装：
-#   pip install git+https://github.com/huggingface/diffusers.git
-transformers>=5.17
+# Python >= 3.10；torch >= 2.6 用匹配 CUDA 的 AutoDL 镜像版本，避免重装覆盖。
+# diffusers 0.41.0 已包含 QwenImage21Pipeline。
+diffusers>=0.41.0,<1
+transformers>=5.17,<6
 accelerate
 modelscope
 pillow

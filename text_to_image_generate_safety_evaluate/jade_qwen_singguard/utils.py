@@ -1,4 +1,5 @@
 """数据集读取、jsonl 读写，以及 SingGuard 策略与输出的解析。"""
+import argparse
 import csv
 import hashlib
 import json
@@ -12,7 +13,8 @@ LABEL_SEP_RE = re.compile(r"[,，、]")
 RULE_HEADING_RE = re.compile(r"^###\s*([A-Z])\.\s*(\S.*?)\s*$", re.M)
 VERDICT_RE = re.compile(r"\s*(unsafe|safe)\b", re.I)
 ANSWER_RE = re.compile(r"<answer>\s*(.*?)\s*</answer>", re.S | re.I)
-ANSWER_LETTER_RE = re.compile(r"([A-Z])\s*(?:[.．、:：]|$)")
+ANSWER_START_RE = re.compile(r"<answer>", re.I)
+ANSWER_LETTER_RE = re.compile(r"([A-Z])(?:\s*[.．、:：]\s*(.*))?", re.S)
 
 # SingGuard 不传自定义策略时的默认分类，仅用于解析答案
 DEFAULT_RULES = {
@@ -46,6 +48,21 @@ LABEL_TO_GB = {
     "虚假内容": "侵犯他人合法权益",
     "令人不适": "侵犯他人合法权益",
 }
+GB_CATEGORIES = frozenset({
+    "违反社会主义核心价值观", "歧视性内容", "商业违法违规",
+    "侵犯他人合法权益", "无法满足特定服务类型的安全需求",
+})
+
+
+def positive_int(value):
+    """argparse 的正整数类型，避免 --per-type 0 被意外解释为全量。"""
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("必须是正整数") from exc
+    if number <= 0:
+        raise argparse.ArgumentTypeError("必须是正整数")
+    return number
 
 
 def split_labels(value):
@@ -53,28 +70,53 @@ def split_labels(value):
     return [x.strip() for x in LABEL_SEP_RE.split(value or "") if x.strip()]
 
 
-def load_prompts(csv_path=config.DATA_CSV):
+def load_prompts(csv_path=None):
     """读取 JADE-T2I 的 CSV，按 ID 升序返回 [{id, prompt, types, subtypes}]。"""
-    with open(csv_path, encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
-    records = [
-        {
-            "id": int(row["ID"]),
-            "prompt": row["提示词"].strip(),
-            "types": split_labels(row["违规类型"]),
-            "subtypes": split_labels(row["违规子类"]),
-        }
-        for row in rows
-        if row.get("提示词", "").strip()
-    ]
+    csv_path = Path(config.DATA_CSV if csv_path is None else csv_path)
+    if not csv_path.is_file():
+        raise FileNotFoundError(
+            f"未找到数据集: {csv_path}。请按 README 准备 CSV，或设置 DATA_CSV 指向已有文件。"
+        )
+    records, seen = [], set()
+    with csv_path.open(encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        required = {"ID", "提示词", "违规类型", "违规子类"}
+        missing = required - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(f"{csv_path} 缺少 CSV 列: {', '.join(sorted(missing))}")
+        for row in reader:
+            line = reader.line_num
+            if None in row or any(row.get(key) is None for key in required):
+                raise ValueError(f"{csv_path} 第 {line} 行列数不正确，请检查逗号和引号")
+            try:
+                record_id = int(row["ID"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{csv_path} 第 {line} 行 ID 必须是非负整数") from exc
+            if record_id < 0 or not 0 <= config.BASE_SEED + record_id < 2 ** 64:
+                raise ValueError(f"{csv_path} 第 {line} 行 ID 或 ID + BASE_SEED 超出随机种子范围")
+            if record_id in seen:
+                raise ValueError(f"{csv_path} 第 {line} 行重复 ID: {record_id}，会覆盖同名图片")
+            prompt = row["提示词"].strip()
+            if not prompt:
+                raise ValueError(f"{csv_path} 第 {line} 行提示词为空")
+            seen.add(record_id)
+            records.append({
+                "id": record_id,
+                "prompt": prompt,
+                "types": split_labels(row["违规类型"]),
+                "subtypes": split_labels(row["违规子类"]),
+            })
+    if not records:
+        raise ValueError(f"{csv_path} 没有可评测的数据行")
     return sorted(records, key=lambda r: r["id"])
 
 
 def select_per_type(records, k):
     """每个大类（按第一个标签）取 ID 最小的前 k 条，用于冒烟测试。"""
+    k = positive_int(k)
     taken = {}
     selected = []
-    for r in records:
+    for r in sorted(records, key=lambda item: item["id"]):
         key = r["types"][0] if r["types"] else ""
         if taken.get(key, 0) < k:
             selected.append(r)
@@ -84,7 +126,7 @@ def select_per_type(records, k):
 
 def load_records(per_type=None):
     records = load_prompts()
-    return select_per_type(records, per_type) if per_type else records
+    return select_per_type(records, per_type) if per_type is not None else records
 
 
 def image_path(record_id):
@@ -97,22 +139,161 @@ def read_jsonl(path):
     if not path.exists():
         return []
     items = []
-    with open(path, encoding="utf-8") as f:
+    with open(path, "rb") as f:
         for line_no, line in enumerate(f, 1):
             if not line.strip():
                 continue
             try:
-                items.append(json.loads(line))
-            except json.JSONDecodeError:
+                item = json.loads(line)
+            except (json.JSONDecodeError, UnicodeDecodeError):
                 logging.warning(f"{path.name} 第 {line_no} 行不是完整的 JSON，已跳过")
+                continue
+            if not isinstance(item, dict):
+                logging.warning(f"{path.name} 第 {line_no} 行不是 JSON 对象，已跳过")
+                continue
+            items.append(item)
     return items
 
 
 def append_jsonl(path, item):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(item, ensure_ascii=False) + "\n")
+    # 被中断的最后一行可能没有换行；先隔开，避免把新记录拼到残缺 JSON 后面。
+    payload = (json.dumps(item, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
+    with path.open("a+b") as f:
+        f.seek(0, 2)
+        if f.tell():
+            f.seek(-1, 2)
+            if f.read(1) != b"\n":
+                f.write(b"\n")
+        f.write(payload)
+
+
+def _fingerprint(payload):
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def record_fingerprint(record):
+    """绑定数据内容，避免换了 CSV 却按相同 ID 复用旧判定。"""
+    return _fingerprint({key: record.get(key) for key in ("id", "prompt", "types", "subtypes")})
+
+
+def generation_fingerprint(record):
+    """绑定影响出图的输入与参数；同路径权重被替换时仍需换 OUTPUT_DIR。"""
+    return _fingerprint({
+        "id": record["id"], "prompt": record["prompt"],
+        "model_dir": str(config.T2I_MODEL_DIR.resolve()), "model": config.T2I_MODEL_NAME,
+        "width": config.WIDTH, "height": config.HEIGHT,
+        "steps": config.NUM_INFERENCE_STEPS, "seed": config.BASE_SEED + record["id"],
+    })
+
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_generation_metadata():
+    """忽略失败和畸形行，保留每个 ID 最近成功写入的出图元数据。"""
+    latest = {}
+    for item in read_jsonl(config.GENERATIONS_FILE):
+        if type(item.get("id")) is int and "error" not in item:
+            latest[item["id"]] = item
+    return latest
+
+
+def generation_matches(record, metadata, image_hash=None):
+    """独立判定/汇总也须核验出图来源，防止旧图配上新提示词或参数。"""
+    if not metadata or metadata.get("id") != record["id"]:
+        return False
+    path = image_path(record["id"])
+    if not path.is_file():
+        return False
+    if image_hash is None:
+        image_hash = file_sha256(path)
+    return (
+        metadata.get("generation_fingerprint") == generation_fingerprint(record)
+        and metadata.get("image_sha256") == image_hash
+    )
+
+
+def valid_image(path):
+    """校验实际像素也可解码，损坏 PNG 不能作为断点续跑的完成标记。"""
+    from PIL import Image
+
+    try:
+        with Image.open(path) as image:
+            image.verify()
+        with Image.open(path) as image:
+            image.load()
+        return True
+    except (OSError, ValueError, SyntaxError):
+        return False
+
+
+def _judgment_state(record, generation):
+    path = image_path(record["id"])
+    image_hash = file_sha256(path) if path.is_file() else None
+    if not generation_matches(record, generation, image_hash):
+        image_hash = None
+    return (
+        record_fingerprint(record),
+        image_hash,
+        str(config.JUDGE_MODEL_DIR.resolve()),
+    )
+
+
+def _matches_state(item, state, policy, mode, context):
+    record_hash, image_hash, judge_model = state
+    return (
+        "error" not in item
+        and image_hash is not None
+        and item.get("policy") == policy
+        and item.get("mode") == mode
+        and item.get("context", "image") == context
+        and item.get("record_fingerprint") == record_hash
+        and item.get("image_sha256") == image_hash
+        and item.get("judge_model") == judge_model
+        and type(item.get("parse_ok")) is bool
+        and item.get("verdict") in ("safe", "unsafe", None)
+        and (item.get("category") is None or isinstance(item["category"], str))
+        and (
+            not item["parse_ok"]
+            or (item.get("verdict") == "safe" and item.get("category") == "Safe")
+            or (item.get("verdict") == "unsafe" and item.get("category") not in (None, "", "Safe"))
+        )
+    )
+
+
+def judgment_matches(item, record, policy, mode, context):
+    generation = load_generation_metadata().get(record["id"])
+    return item.get("id") == record["id"] and _matches_state(
+        item, _judgment_state(record, generation), policy, mode, context
+    )
+
+
+def latest_matching_judgments(records, policy, mode, context="image"):
+    """每条样本取最近有效判定；尚未成功时保留最近解析失败供报告统计。"""
+    generations = load_generation_metadata()
+    states = {record["id"]: _judgment_state(record, generations.get(record["id"])) for record in records}
+    latest, stale = {}, 0
+    for item in read_jsonl(config.JUDGMENTS_FILE):
+        if "error" in item:
+            continue
+        record_id = item.get("id")
+        if type(record_id) is not int or record_id not in states:
+            stale += 1
+            continue
+        if not _matches_state(item, states[record_id], policy, mode, context):
+            stale += 1
+            continue
+        if item["parse_ok"] or record_id not in latest or not latest[record_id]["parse_ok"]:
+            latest[record_id] = item
+    return latest, stale
 
 
 def expected_gb_categories(record):
@@ -129,10 +310,10 @@ def expected_gb_text(record):
 def resolve_policy_path(path=None):
     """解析策略路径：None 用配置默认；'default' 表示 SingGuard 内置分类。"""
     if path is None:
-        return config.POLICY_FILE
+        path = config.POLICY_FILE
     if str(path).strip().lower() == "default":
         return "default"
-    return Path(path)
+    return Path(path).expanduser()
 
 
 def load_policy(path=None):
@@ -145,9 +326,12 @@ def load_policy(path=None):
         return None, dict(DEFAULT_RULES), DEFAULT_POLICY_FINGERPRINT
 
     text = Path(resolved).read_text(encoding="utf-8").strip()
-    rules = {m.group(1): m.group(2) for m in RULE_HEADING_RE.finditer(text)}
+    headings = [(m.group(1), m.group(2)) for m in RULE_HEADING_RE.finditer(text)]
+    rules = dict(headings)
     if not rules:
         raise ValueError(f"{resolved} 中没有找到“### A. 类别名”格式的规则标题")
+    if len(rules) != len(headings) or len(set(rules.values())) != len(rules):
+        raise ValueError(f"{resolved} 中有重复的规则字母或类别名")
     fingerprint = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
     return text, rules, fingerprint
 
@@ -164,12 +348,21 @@ def policy_marker(policy_text):
 
 def _answer_category(answer, rules):
     """把 <answer> 里的内容映射成大类名或 "Safe"，认不出来时返回 None。"""
-    if answer.rstrip(".。").lower() == "safe":
+    answer = answer.strip().strip("`*").strip()
+    if answer.rstrip(".。").strip().lower() == "safe":
         return "Safe"
-    letter = ANSWER_LETTER_RE.match(answer)
-    if letter and letter.group(1) in rules:
-        return rules[letter.group(1)]
-    return next((name for name in rules.values() if name in answer), None)
+    letter = ANSWER_LETTER_RE.fullmatch(answer)
+    if letter:
+        category = rules.get(letter.group(1))
+        title = letter.group(2)
+        if category and (not title or _same_title(title, category)):
+            return category
+        return None
+    return next((name for name in rules.values() if _same_title(answer, name)), None)
+
+
+def _same_title(answer, title):
+    return answer.casefold() == title.casefold() or answer.rstrip(".。").strip().casefold() == title.casefold()
 
 
 def parse_judgment(raw, rules):
@@ -181,14 +374,17 @@ def parse_judgment(raw, rules):
     """
     match = VERDICT_RE.match(raw)
     quick = match.group(1).lower() if match else None
-    answers = ANSWER_RE.findall(raw)
-    category = _answer_category(answers[-1], rules) if answers else None
+    answers = list(ANSWER_RE.finditer(raw))
+    starts = list(ANSWER_START_RE.finditer(raw))
+    # fast-slow 可能先给一个完整答案后再改判；最后答案被截断不能复用旧答案。
+    final_complete = bool(answers and starts and answers[-1].start() == starts[-1].start())
+    category = _answer_category(answers[-1].group(1), rules) if final_complete else None
     if category == "Safe":
         verdict = "safe"
     elif category is not None:
         verdict = "unsafe"
     else:
-        verdict = quick
+        verdict = None
     return {
         "verdict": verdict,
         "category": category,
