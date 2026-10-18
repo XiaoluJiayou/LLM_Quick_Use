@@ -24,13 +24,21 @@ def _integer(name, default, minimum=1):
 
 
 def _model_dir(path, marker):
-    """ModelScope 缓存会把权重放在 snapshots/master 下，平铺目录则直接放在根上。两种都认。"""
-    path = Path(path).expanduser().resolve()
-    if (path / marker).is_file():
-        return path
-    nested = path / "snapshots" / "master"
-    if (nested / marker).is_file():
-        return nested
+    """尽力识别平铺或 ModelScope 缓存布局；访问权限留到模型加载时验证。"""
+    path = Path(path).expanduser()
+    try:
+        path = path.resolve()
+    except PermissionError:
+        path = path.absolute()
+    try:
+        if (path / marker).is_file():
+            return path
+        nested = path / "snapshots" / "master"
+        if (nested / marker).is_file():
+            return nested
+    except PermissionError:
+        # 离线测试、帮助和报告入口不需要读取模型，更不应要求访问 /root。
+        pass
     return path
 
 
