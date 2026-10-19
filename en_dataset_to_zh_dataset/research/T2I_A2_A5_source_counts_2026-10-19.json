@@ -1,0 +1,142 @@
+{
+  "as_of": "2026-10-19",
+  "timezone": "Asia/Shanghai",
+  "status": "source_research_not_final_dataset",
+  "local_dataset": {
+    "path": "en_dataset_to_zh_dataset/zh_data/T2I-RiskyPrompt.zh.json",
+    "rows": 6261,
+    "A2_label_occurrences": 1,
+    "A5_label_occurrences": 0,
+    "sha256": "4fd4a7f38577c8d3aa146ef8da33721337ff26a7c36f2758d8db828f9af9eee4"
+  },
+  "standard": {
+    "id": "GB/T 45654-2025",
+    "local_pdf": "text_to_image_generate_safety_evaluate/jade_qwen_singguard/GBT+45654-2025.pdf",
+    "sha256": "014358355f6a43a4f41b98cd972a8d3ea1e9595910305255d3cc7988a8a739d0",
+    "inspected_pdf_pages_one_based": [13, 14, 15]
+  },
+  "counts": [
+    {
+      "dataset": "CoProV2 / SafetyDPO",
+      "url": "https://raw.githubusercontent.com/Visualignment/SafetyDPO/main/data/CoProv2_train.csv",
+      "revision": "5f71f8db885f096f84abd391f48e49e78b32e8d1",
+      "revision_date": "2025-08-26T20:11:08Z",
+      "measurement": "remote_public_csv_parse",
+      "language": "en",
+      "license_declared": "MIT",
+      "total_rows": 32086,
+      "hate_rows_including_safe_pairs": 8786,
+      "candidate_filter": "category == 'Hate' and image.startswith('u_')",
+      "candidate_rows": 4393,
+      "candidate_unique_texts": 4212,
+      "deduplication": "trim + lowercase",
+      "gbt_semantic_review_complete": false
+    },
+    {
+      "dataset": "DETONATE",
+      "url": "https://github.com/abhilekhborah/Detonate",
+      "revision": "e6c3214948eef85e33cf5b8175c741dd79db161a",
+      "revision_date": "2026-01-16T13:16:23Z",
+      "measurement": "remote_public_csv_parse",
+      "language": "en",
+      "license_declared": "Apache-2.0; retain upstream source terms",
+      "files": [
+        {"name": "race_hateful.csv", "rows": 10900, "unique_texts": 10749},
+        {"name": "gender_hateful.csv", "rows": 6228, "unique_texts": 5997},
+        {"name": "disability_hateful.csv", "rows": 10200, "unique_texts": 9922}
+      ],
+      "candidate_rows": 27328,
+      "candidate_unique_texts_across_files": 25416,
+      "deduplication": "trim + lowercase",
+      "gbt_semantic_review_complete": false,
+      "adaptation_note": "Many texts are social-media hate speech rather than visual scene descriptions."
+    },
+    {
+      "dataset": "T2ISafety evaluation",
+      "url": "https://huggingface.co/datasets/OpenSafetyLab/t2isafety_evaluation/resolve/main/safety.jsonl",
+      "revision": "035b26f4d11e64773a2bd17869ae5a187f85be6d",
+      "measurement": "remote_public_jsonl_parse",
+      "language": "en",
+      "license_declared": "MIT",
+      "total_rows": 2450,
+      "candidate_filter": "category == 'hate'",
+      "candidate_rows": 300,
+      "candidate_unique_texts": 300,
+      "gbt_semantic_review_complete": false
+    },
+    {
+      "dataset": "JADE-T2I v2.0",
+      "url": "https://raw.githubusercontent.com/whitzard-ai/jade-db/main/jade-t2i-v2.0/jade_htg_benchmark_zh.csv",
+      "revision": "cfb889959e15d49e79b00e3e7dc52e0e232e1ca8",
+      "measurement": "remote_public_csv_parse",
+      "language": "zh",
+      "license_declared": "MIT repository; academic-research statement on project website",
+      "total_rows": 400,
+      "hate_and_discrimination_rows": 20,
+      "candidate_filter": "Category == 'Hate and Discrimination' and Subcategory != 'Terrorism'",
+      "candidate_rows": 16,
+      "gbt_semantic_review_complete": false
+    },
+    {
+      "dataset": "JADE-T2I v1.0",
+      "url": "https://raw.githubusercontent.com/whitzard-ai/jade-db/main/jade-t2i-v1.0/jade_benchmark_zh.csv",
+      "revision": "e8b949936b08e94434f54f8c20de6c1516122257",
+      "measurement": "remote_public_csv_parse",
+      "language": "zh",
+      "license_declared": "MIT repository; academic-research statement on project website",
+      "total_rows": 227,
+      "hate_label_rows": 50,
+      "non_extremism_only_candidate_rows": 40,
+      "candidate_unique_texts": 36,
+      "deduplication": "exact text",
+      "gbt_semantic_review_complete": false,
+      "quality_note": "Old labels include neutral or otherwise insufficient A2 scenes; 36 is a candidate upper bound."
+    },
+    {
+      "dataset": "MedBananaBench",
+      "url": "https://huggingface.co/datasets/FreedomIntelligence/MedBananaBench",
+      "measurement": "official_dataset_card",
+      "language": "en",
+      "license_declared": "Apache-2.0",
+      "medical_t2i_tasks": 296,
+      "rubric_criteria_not_samples": 9015,
+      "verified_unsafe_A5_prompt_count": null,
+      "note": "Benign medical T2I tasks require output evaluation for A5."
+    },
+    {
+      "dataset": "CheXGenBench",
+      "url": "https://raman1121.github.io/CheXGenBench/",
+      "measurement": "official_project_documentation",
+      "language": "en",
+      "license_declared": "Apache-2.0 repository; MIMIC-CXR access and data-use terms also apply",
+      "downstream_clinical_description_prompts": 20000,
+      "verified_unsafe_A5_prompt_count": null
+    },
+    {
+      "dataset": "MMMG / MMMGBench",
+      "url": "https://huggingface.co/datasets/MMMGBench/MMMG",
+      "measurement": "official_dataset_card",
+      "language": "en",
+      "license_declared": "Apache-2.0",
+      "total_image_prompt_pairs": 4456,
+      "verified_A5_relevant_subset_size": null
+    },
+    {
+      "dataset": "Public health generation safeguards study",
+      "url": "https://journals.sagepub.com/doi/full/10.1177/00333549261418596",
+      "published": "2026-02-26",
+      "measurement": "primary_paper",
+      "language": "en",
+      "license_declared": "CC-BY-4.0 article and supplement; complete outputs on reasonable request",
+      "prompts": 50,
+      "themes": 5,
+      "paraphrases_per_theme": 10,
+      "model_submissions_not_unique_prompts": 1000,
+      "verified_A5_relevant_subset_size": null,
+      "note": "Health misinformation, unhealthy-behavior promotion, and weight stigma require separate GBT mapping."
+    }
+  ],
+  "cross_dataset_semantic_deduplication_complete": false,
+  "raw_prompt_datasets_saved_locally": false,
+  "existing_dataset_modified": false
+}

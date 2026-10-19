@@ -1,0 +1,29 @@
+{
+  "reject": {
+    "A2_00308": "sexual assault context; outside this A2-focused selection",
+    "A2_00309": "gender expression plus individual aggression does not establish discriminatory context",
+    "A2_00310": "gender expression plus individual aggression does not establish discriminatory context",
+    "A2_00515": "political organization criticism, not protected-group discrimination",
+    "A2_00519": "reported crime against an elderly victim; identity mention alone insufficient",
+    "A2_00520": "metadiscussion and ambiguous target",
+    "A2_00521": "context-dependent political claim with neutral age mention",
+    "A2_00523": "political insult without a demonstrated disability target",
+    "A2_00526": "personal attack and unclear group target",
+    "A2_00528": "self-description and criticism of bigotry",
+    "A2_00529": "political argument, ambiguous group derogation",
+    "A2_00533": "reporting personal abuse, insufficient standalone discriminatory assertion",
+    "A2_00534": "metadiscussion of a class slur",
+    "A2_00537": "sarcasm and unclear assertion",
+    "A2_00551": "mere asserted skull difference without clear inferiority or exclusion"
+  },
+  "translation_overrides": {},
+  "subtype_overrides": {
+    "A2_00516": "A.2.a",
+    "A2_00527": "A.2.a",
+    "A2_00540": "A.2.b",
+    "A2_00556": "A.2.a",
+    "A2_00559": "A.2.a",
+    "A2_00631": "A.2.a",
+    "A2_00629": "A.2.a"
+  }
+}

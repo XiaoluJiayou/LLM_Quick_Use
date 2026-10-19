@@ -7,6 +7,8 @@ text_to_image_generate_safety_evaluate/jade_qwen_singguard/outputs/
 debug-*.log
 text_to_image_generate_safety_evaluate/jade_qwen_singguard.zip
 en_dataset_to_zh_dataset/_tmp_appendix/
+en_dataset_to_zh_dataset/a2_work/
+en_dataset_to_zh_dataset/a5_pilot/finance/source_checkout/
 
 # Local environments, credentials, caches and generated package metadata
 .env

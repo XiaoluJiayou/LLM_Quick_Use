@@ -10,19 +10,27 @@
 
 无法归入任一类时，输出 `无法映射`。完整小类条文以 [gbt_categories.md](gbt_categories.md) 为准（该文件会写入模型提示词）。标准原文 PDF 见评测目录中的 `GBT+45654-2025.pdf`。
 
+## 新增 A2 中文歧视风险集
+
+已构建 [T2I-Discrimination-A2.zh.json](zh_data/T2I-Discrimination-A2.zh.json)，共 **2,000 条**，格式为 `prompt`、`label`。来源为 CoProV2 485 条、DETONATE 1,494 条、JADE 原生中文 21 条；英文来源均已逐条对照作中文校订或适配。DETONATE 为中文文字入图任务，九小类分布不均衡。现已全部合并到 `T2I-RiskyPrompt.zh.json`，总计 **8,261 条**、A2 **2,001 条**，原有 6,261 条的内容、标签及 ID 保留，A5 本次不处理。
+
+具体口径、来源许可、逐条溯源、校验结果和离线复现方法见 [A2 数据说明](zh_data/T2I-Discrimination-A2.README.md)。
+
 ## 已完成的 T2I-RiskyPrompt 数据
 
 已完成的中文数据使用原始字符串索引，每条记录仅含 `prompt` 和 `label`，支持多标签。其具体标注口径见[数据说明](zh_data/T2I-RiskyPrompt.zh.README.md)，与下方通用 API 转换工具的字段格式分别说明。
 
 | 文件 | 内容 |
 | --- | --- |
-| [正式中文数据](zh_data/T2I-RiskyPrompt.zh.json) | 6,261 条，提示词和标签均非空。 |
+| [正式中文数据](zh_data/T2I-RiskyPrompt.zh.json) | 8,261 条，包含新增 A2 2,000 条，提示词和标签均非空。 |
+| [合并前备份](zh_data/T2I-RiskyPrompt.zh.before-A2.json) | 原有 6,261 条的完整备份。 |
+| [A2 合并对照](zh_data/T2I-RiskyPrompt.zh.a2-merge.json) | 新增索引 6433–8432 到独立 A2 集的来源映射。 |
 | [完整英文原件](en_data/T2I-RiskyPrompt.json) | 6,433 条源数据。 |
 | [英文过滤版](en_data/T2I-RiskyPrompt.filtered.json) | 6,356 条，保留英文原文及索引；移除 77 条涉及未成年人或相关年龄存疑的敏感例外。 |
 | [排除清单](zh_data/T2I-RiskyPrompt.zh.excluded.json) | 172 条元数据，不含提示词，用于追溯。 |
 | [校验结果](zh_data/T2I-RiskyPrompt.zh.validation.json) | 文件摘要、结构、索引覆盖、数量和生成参数检查。 |
 
-分批译文、空待复核文件、重复审计及多轮调整历史已清理。保留的正式中文数据内容未改变。
+原数据清理阶段的分批译文、空待复核文件及多轮调整历史已清理；此次 A2 合并保留了备份和来源对照。完整英文原件与过滤版仍只对应原始来源，不包含新增 A2 的英文原文；后者见 A2 溯源文件。
 
 无需安装依赖或连接模型服务，即可在项目根目录检查交付文件：
 

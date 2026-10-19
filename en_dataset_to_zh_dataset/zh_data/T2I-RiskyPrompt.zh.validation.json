@@ -3,7 +3,9 @@
   "counts": {
     "source_original": 6433,
     "source_uploaded": 6356,
-    "main": 6261,
+    "main": 8261,
+    "original_retained": 6261,
+    "A2_added": 2000,
     "review": 0,
     "excluded": 172,
     "multilabel": 1622
@@ -11,7 +13,7 @@
   "source_original_sha256": "e566f40c5970525b532ec6289e98f098cc87936a3b9d290ada00ece26b165669",
   "label_counts": {
     "包含违反社会主义核心价值观的内容": 3833,
-    "包含歧视性内容": 1,
+    "包含歧视性内容": 2001,
     "商业违法违规": 2209,
     "侵犯他人合法权益": 1862,
     "无法满足特定服务类型的安全需求": 0
@@ -25,15 +27,22 @@
     "content_unchanged:zh_data/T2I-RiskyPrompt.zh.json": true,
     "content_unchanged:zh_data/T2I-RiskyPrompt.zh.excluded.json": true,
     "content_unchanged:en_data/T2I-RiskyPrompt.filtered.json": true,
+    "pre_merge_baseline_checksum": true,
+    "original_records_and_labels_unchanged": true,
+    "appended_id_range_and_mapping": true,
+    "all_added_records_match_A2_source": true,
+    "merge_manifest_hashes": true,
     "main_schema": true,
     "excluded_metadata_schema": true,
     "english_schema": true,
     "record_counts": true,
     "complete_original_index_coverage": true,
+    "complete_merged_index_coverage": true,
     "disjoint_main_and_excluded": true,
     "original_index_order": true,
     "sensitive_source_exceptions_omitted": true,
-    "all_main_indices_have_english_source": true,
+    "all_original_indices_have_english_source": true,
+    "all_added_indices_have_A2_source": true,
     "main_prompts_and_labels_nonempty": true,
     "chinese_translations_present": true,
     "no_unchanged_english_prompts": true,
@@ -47,21 +56,22 @@
   },
   "artifacts": {
     "zh_data/T2I-RiskyPrompt.zh.json": {
-      "bytes": 1638278,
-      "sha256": "913337f026da3f054700634dadd72ddcdb0e7049df321caa94e5d5a4b364587e"
+      "bytes": 2008840,
+      "sha256": "21490d0a79a2ba558b4bbbc94f21c6a0c290e31db0cec4e9011de79a9284e5e5"
     },
     "zh_data/T2I-RiskyPrompt.zh.excluded.json": {
-      "bytes": 58464,
-      "sha256": "70cfb830b90f3aedcd67df1733a0f702db6f5e43b948203dbb56b9f8865453bb"
+      "bytes": 57070,
+      "sha256": "6330af1fb314a9c08f92cb19787586631ee239a89b179a7609ca2b45a6c180ca"
     },
     "en_data/T2I-RiskyPrompt.filtered.json": {
-      "bytes": 3532686,
-      "sha256": "9b61593523223330df79d06d00a0581a7a5fd8c2196c3acba7e14215a262f01c"
+      "bytes": 3474609,
+      "sha256": "67b9fea0f69bd32529f1c6a40fda310338d37b0c77b63a8d6b8be4bb0d8068ed"
     }
   },
   "notes": [
     "Standard category names with user-defined topic mappings.",
-    "Retained Chinese prompts and indices are unchanged after cleanup.",
+    "Original 6261 records, labels and indices are unchanged; 2000 A2 records appended at IDs 6433-8432.",
+    "Original English and exclusion files are unchanged by this merge; their checksums were refreshed from the pre-merge workspace artifacts.",
     "Validation uses only delivered files; the complete local English input is optional."
   ]
 }
