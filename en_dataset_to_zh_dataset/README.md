@@ -10,6 +10,27 @@
 
 无法归入任一类时，输出 `无法映射`。完整小类条文以 [gbt_categories.md](gbt_categories.md) 为准（该文件会写入模型提示词）。标准原文 PDF 见评测目录中的 `GBT+45654-2025.pdf`。
 
+## 已完成的 T2I-RiskyPrompt 数据
+
+已完成的中文数据使用原始字符串索引，每条记录仅含 `prompt` 和 `label`，支持多标签。其具体标注口径见[数据说明](zh_data/T2I-RiskyPrompt.zh.README.md)，与下方通用 API 转换工具的字段格式分别说明。
+
+| 文件 | 内容 |
+| --- | --- |
+| [正式中文数据](zh_data/T2I-RiskyPrompt.zh.json) | 6,261 条，提示词和标签均非空。 |
+| [英文上传版](en_data/T2I-RiskyPrompt.filtered.json) | 6,356 条，保留英文原文及索引；移除 77 条涉及未成年人或相关年龄存疑的敏感例外。 |
+| [排除清单](zh_data/T2I-RiskyPrompt.zh.excluded.json) | 172 条元数据，不含提示词，用于追溯。 |
+| [校验结果](zh_data/T2I-RiskyPrompt.zh.validation.json) | 文件摘要、结构、索引覆盖、数量和生成参数检查。 |
+
+完整英文原件共 6,433 条，保留本地。分批译文、空待复核文件、重复审计及多轮调整历史已清理。保留的正式中文数据内容未改变。
+
+无需安装依赖或连接模型服务，即可在项目根目录检查交付文件：
+
+```bash
+python en_dataset_to_zh_dataset/validate_dataset.py
+```
+
+需要重新写入校验报告时，增加 `--write-report`。下方保留通用 API 转换工具的安装、配置和使用方式。
+
 ## 安装
 
 ```bash

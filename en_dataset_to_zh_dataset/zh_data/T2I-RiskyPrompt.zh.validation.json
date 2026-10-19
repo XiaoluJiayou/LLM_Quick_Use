@@ -1,0 +1,67 @@
+{
+  "result": "passed",
+  "counts": {
+    "source_original": 6433,
+    "source_uploaded": 6356,
+    "main": 6261,
+    "review": 0,
+    "excluded": 172,
+    "multilabel": 1622
+  },
+  "source_original_sha256": "e566f40c5970525b532ec6289e98f098cc87936a3b9d290ada00ece26b165669",
+  "label_counts": {
+    "包含违反社会主义核心价值观的内容": 3833,
+    "包含歧视性内容": 1,
+    "商业违法违规": 2209,
+    "侵犯他人合法权益": 1862,
+    "无法满足特定服务类型的安全需求": 0
+  },
+  "excluded_breakdown": {
+    "original_sensitive_exceptions": 27,
+    "empty_prompt_removals": 50,
+    "irrelevant_removals": 95
+  },
+  "checks": {
+    "content_unchanged:zh_data/T2I-RiskyPrompt.zh.json": true,
+    "content_unchanged:zh_data/T2I-RiskyPrompt.zh.excluded.json": true,
+    "content_unchanged:en_data/T2I-RiskyPrompt.filtered.json": true,
+    "main_schema": true,
+    "excluded_metadata_schema": true,
+    "english_schema": true,
+    "record_counts": true,
+    "complete_original_index_coverage": true,
+    "disjoint_main_and_excluded": true,
+    "original_index_order": true,
+    "sensitive_source_exceptions_omitted": true,
+    "all_main_indices_have_english_source": true,
+    "main_prompts_and_labels_nonempty": true,
+    "chinese_translations_present": true,
+    "no_unchanged_english_prompts": true,
+    "no_translation_placeholders": true,
+    "label_counts": true,
+    "multilabel_count": true,
+    "exclusion_breakdown": true,
+    "generation_parameter_names_retained": true,
+    "nontext_generation_parameter_values_retained": true,
+    "local_original_source_unchanged": true
+  },
+  "artifacts": {
+    "zh_data/T2I-RiskyPrompt.zh.json": {
+      "bytes": 1638278,
+      "sha256": "913337f026da3f054700634dadd72ddcdb0e7049df321caa94e5d5a4b364587e"
+    },
+    "zh_data/T2I-RiskyPrompt.zh.excluded.json": {
+      "bytes": 58464,
+      "sha256": "70cfb830b90f3aedcd67df1733a0f702db6f5e43b948203dbb56b9f8865453bb"
+    },
+    "en_data/T2I-RiskyPrompt.filtered.json": {
+      "bytes": 3532686,
+      "sha256": "9b61593523223330df79d06d00a0581a7a5fd8c2196c3acba7e14215a262f01c"
+    }
+  },
+  "notes": [
+    "Standard category names with user-defined topic mappings.",
+    "Retained Chinese prompts and indices are unchanged after cleanup.",
+    "Validation uses only delivered files; the complete local English input is optional."
+  ]
+}
