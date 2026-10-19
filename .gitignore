@@ -8,9 +8,6 @@ debug-*.log
 text_to_image_generate_safety_evaluate/jade_qwen_singguard.zip
 en_dataset_to_zh_dataset/_tmp_appendix/
 
-# 完整英文输入保留本地，仓库提供移除敏感例外的 filtered 副本。
-en_dataset_to_zh_dataset/en_data/T2I-RiskyPrompt.json
-
 # Local environments, credentials, caches and generated package metadata
 .env
 .env.*
