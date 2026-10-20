@@ -27,7 +27,7 @@ Linux 激活方式为 `source .venv/bin/activate`，Windows PowerShell 可用 `.
 | `qwen-vl` | Qwen3-VL 截图评估；需匹配权重与库版本 |
 | `test` | 不下载模型的公共回归依赖；张量测试有 torch 时执行 |
 
-例如 `python -m pip install -e ".[api,data]"`。GPU 环境先按设备 CUDA 版本安装匹配的 torch/torchvision，再安装任务依赖。Wan、LTX、Helios、LongCat、Janus、UniT2IXL 使用各自官方实现和独立环境；它们的专用代码不随本项目安装。Qwen-Image-2.1 / SingGuard 的版本要求见其[专门说明](text_to_image_generate_safety_evaluate/jade_qwen_singguard/README.md)。
+例如 `python -m pip install -e ".[api,data]"`。GPU 环境先按设备 CUDA 版本安装匹配的 torch/torchvision，再安装任务依赖。Wan、LTX、Helios、LongCat、Janus、UniT2IXL 使用各自官方实现和独立环境；它们的专用代码不随本项目安装。Qwen-Image-2.1 / SingGuard 的版本要求见其[专门说明](text_to_image_generate_safety_evaluate/t2i_qwen_singguard/README.md)。
 
 `.env.example` 列出环境变量名，脚本读取当前进程环境；不会自动加载 `.env`。不要将凭据直接写进源码或命令行。生成文件建议放 `outputs/`、`results/`，下载权重放 `downloads/`，这些目录已忽略；原先已跟踪的样例媒体仍保留。
 
@@ -45,7 +45,7 @@ Linux 激活方式为 `source .venv/bin/activate`，Windows PowerShell 可用 `.
 | `base_ldm.py` / `full_ldm_unet.py` / `full_ldm_encode_decode.py` | 教学 LDM 与自编码器，支持无需数据的小张量检查 |
 | [Text_and_Image_to_video_evaluate](Text_and_Image_to_video_evaluate/README.md) | 视频后端入口、全视频抽帧、截图评估与 Base64 工具 |
 | [video-content-safety-evaluate](video-content-safety-evaluate/README.md) | 阿里云、百度视频审核的显式调用示例 |
-| [JADE + Qwen + SingGuard](text_to_image_generate_safety_evaluate/jade_qwen_singguard/README.md) | 带来源校验的文生图安全评测 |
+| [T2I RiskyPrompt + Qwen + SingGuard](text_to_image_generate_safety_evaluate/t2i_qwen_singguard/README.md) | 带来源校验的文生图安全评测 |
 | `text_to_image_generate_safety_evaluate/*.ipynb` | Janus、UniT2IXL、LlavaGuard 探索示例；按实际数据长度执行 |
 | `main.py` / `leetcode.py` / `linked_list_intersection.py` / `video-content-safety-evaluate/prim_test.py` | 独立学习示例 |
 | `llm_quick_use` / `tools` / `tests` | 公共工具、项目检查和离线回归 |
@@ -93,7 +93,7 @@ python Text_and_Image_to_video_evaluate/batch_videos_frame_extract.py --input-di
 
 LDM 的 `--smoke-test` 使用随机小张量，不下载 MNIST 或 VGG；完整训练才需要数据和预训练权重。CLIP 阈值属于实验参数，需要带标注验证集校准。抽帧和视频后端的参数、输入 JSON 与实际支持范围见[视频模块说明](Text_and_Image_to_video_evaluate/README.md)；云审核受理成功与最终审核结论需分别解释。
 
-Notebook 需按单元顺序运行。图片生成在加载权重前规范化 ID 并检查重名、空提示词与种子范围；数据生成使用完整 JSON 解码，拒绝覆盖已损坏结果。Notebook 是探索入口，不提供生产评测完整的实验来源与自动续跑；正式文生图评测使用 JADE 目录。
+Notebook 需按单元顺序运行。图片生成在加载权重前规范化 ID 并检查重名、空提示词与种子范围；数据生成使用完整 JSON 解码，拒绝覆盖已损坏结果。Notebook 是探索入口，不提供生产评测完整的实验来源与自动续跑；正式文生图评测使用 `t2i_qwen_singguard` 目录。
 
 ## 验证与迁移
 
@@ -102,8 +102,8 @@ python tools/check_project.py
 python tools/run_checks.py
 ```
 
-检查工具只读取全部 Python 与 Notebook 代码，不导入或执行实验。凭据检查只报告位置，不回显值；它是轻量检查，不能保证识别所有凭据。`run_checks.py` 将公共测试与 JADE 既有回归放在独立进程运行，避免同名模块互相污染。可用 `--json-output docs/code_inventory.json` 保存静态文件清单。
+检查工具只读取全部 Python 与 Notebook 代码，不导入或执行实验。凭据检查只报告位置，不回显值；它是轻量检查，不能保证识别所有凭据。`run_checks.py` 将公共测试与文生图评测回归放在独立进程运行，避免同名模块互相污染。可用 `--json-output docs/code_inventory.json` 保存静态文件清单。
 
-原先自动执行、依赖绝对路径的脚本现在改为显式参数入口，旧的无参启动方式需按 `--help` 更新。旧输出缺来源元数据、输入或配置变更时，使用新输出目录。不要让多个任务同时写同一结果路径。已存在的 JADE 管线和本地学习文件保持独立。
+原先自动执行、依赖绝对路径的脚本现在改为显式参数入口，旧的无参启动方式需按 `--help` 更新。旧输出缺来源元数据、输入或配置变更时，使用新输出目录。不要让多个任务同时写同一结果路径。已存在的 `t2i_qwen_singguard` 管线和本地学习文件保持独立。
 
 真实环境验收须记录：Python/依赖版本、模型 revision、输入数据摘要、GPU/CUDA、随机种子、完成/失败数量、总耗时及显存峰值。先用小样本检查图片/视频、原始回答和统计分母，再开展完整实验；并发、量化与编译加速在此基线上测量后逐项引入。

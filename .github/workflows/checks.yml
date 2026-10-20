@@ -16,7 +16,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install -e '.[test]'
       - run: python tools/run_checks.py
-      - run: bash -n text_to_image_generate_safety_evaluate/jade_qwen_singguard/scripts/run_demo.sh
+      - run: bash -n text_to_image_generate_safety_evaluate/t2i_qwen_singguard/scripts/run_demo.sh
 
   tensor-check:
     runs-on: ubuntu-latest

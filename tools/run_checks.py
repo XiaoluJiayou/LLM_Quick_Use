@@ -1,4 +1,4 @@
-"""运行公共回归和独立的 JADE 回归，隔离同名 config/utils 模块。"""
+"""运行公共回归和独立的文生图评测回归，隔离同名 config/utils 模块。"""
 from __future__ import annotations
 
 import os
@@ -15,7 +15,7 @@ def main():
     commands = [
         (ROOT, [sys.executable, "-B", str(ROOT / "tools" / "check_project.py")]),
         (ROOT, [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"]),
-        (ROOT / "text_to_image_generate_safety_evaluate" / "jade_qwen_singguard",
+        (ROOT / "text_to_image_generate_safety_evaluate" / "t2i_qwen_singguard",
          [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"]),
     ]
     failed = False
