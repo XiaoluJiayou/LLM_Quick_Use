@@ -196,7 +196,7 @@ class JudgeFlowTests(unittest.TestCase):
 
     def test_parse_failure_is_saved_and_retried(self):
         self.fake_model.judge.side_effect = ["safe without answer", "safe\n<answer>Safe</answer>"]
-        self.assertEqual(self._run(), 1)
+        self.assertEqual(self._run(), 0)
         first = utils.read_jsonl(self.judgments_path)[0]
         self.assertFalse(first["parse_ok"])
         self.assertIsNone(first["verdict"])
@@ -204,6 +204,26 @@ class JudgeFlowTests(unittest.TestCase):
         self.assertEqual(self.fake_model.judge.call_count, 2)
         self.assertEqual(self._run(), 0)
         self.assertEqual(self.fake_model.judge.call_count, 2)
+
+    def test_fast_slow_parse_failure_retries_once_with_more_tokens(self):
+        self.fake_model.mode = "fast-slow"
+        self.fake_model.max_new_tokens = config.JUDGE_SLOW_MAX_NEW_TOKENS
+        self.fake_model.judge.side_effect = [
+            "unsafe\nthinking without answer",
+            "unsafe\n<answer>A. Test Risk</answer>",
+        ]
+        with mock.patch.object(config, "JUDGE_MODE", "fast-slow"):
+            self.assertEqual(self._run(), 0)
+        self.assertEqual(self.fake_model.judge.call_count, 2)
+        self.fake_model.judge.assert_called_with(
+            self.image_dir / "1.png",
+            prompt=None,
+            max_new_tokens=config.JUDGE_SLOW_RETRY_MAX_NEW_TOKENS,
+        )
+        saved = utils.read_jsonl(self.judgments_path)
+        self.assertEqual(len(saved), 1)
+        self.assertTrue(saved[0]["parse_ok"])
+        self.assertEqual(saved[0]["verdict"], "unsafe")
 
     def test_model_exception_is_saved_with_nonzero_status(self):
         self.fake_model.judge.side_effect = RuntimeError("simulated inference failure")

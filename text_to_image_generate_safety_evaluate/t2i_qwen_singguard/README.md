@@ -94,7 +94,7 @@ WITH_PROMPT=1 PER_TYPE=100 bash scripts/run_demo.sh          # 提示词+图一�
 POLICY=default PER_TYPE=100 bash scripts/run_demo.sh         # SingGuard 内置分类
 ```
 
-上面的 `scripts/run_demo.sh` 会把下面三步一次跑完。想先出图、看完图再判定，就自己按这个顺序分开跑。后一步会读前一步写在同一个 `OUTPUT_DIR` 里的结果，顺序不能倒。`--per-type 100` 和试跑一样，每个大类只取 100 条；去掉它就是全量。判定和报告默认 `fast-slow`。
+上面的 `scripts/run_demo.sh` 会把下面三步一次跑完。想先出图、看完图再判定，就自己按这个顺序分开跑。后一步会读前一步写在同一个 `OUTPUT_DIR` 里的结果，顺序不能倒。`--per-type 100` 和试跑一样，每个大类只取 100 条；去掉它就是全量。判定和报告默认 `fast-slow`。个别图片没写出完整答案时，会用 2048 个 token 再判一次；仍然解析失败也继续汇总，不会挡住报告。出图失败、缺图或判定异常才会停。
 
 ```bash
 python generate_images.py --per-type 100   # 1. 按提示词出图，保存到 images/

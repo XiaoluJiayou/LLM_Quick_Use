@@ -137,13 +137,14 @@ class SingGuardJudge:
             "请检查 transformers 版本和模型目录里的 chat_template.jinja，不会自动切换模式"
         )
 
-    def judge(self, path, prompt=None):
+    def judge(self, path, prompt=None, max_new_tokens=None):
         with self.image_class.open(path) as img:
             image = img.convert("RGB")
         inputs = self._encode(self._messages(image, prompt), self.template_kwargs)
+        limit = self.max_new_tokens if max_new_tokens is None else max_new_tokens
         with self.torch.inference_mode():
             generated_ids = self.model.generate(
-                **inputs, max_new_tokens=self.max_new_tokens, do_sample=False
+                **inputs, max_new_tokens=limit, do_sample=False
             )
         new_ids = generated_ids[:, inputs["input_ids"].shape[1]:]
         return self.processor.batch_decode(
@@ -207,7 +208,10 @@ def main():
         sys.exit("没有检测到 GPU：AutoDL 实例需要用正常模式（带 GPU）开机，无卡模式只能用来准备环境")
 
     judge = SingGuardJudge(config.JUDGE_MODEL_DIR, policy, args.mode)
-    failed = []
+    hard_failed = []
+    unparsed = []
+    revised_unsafe_to_safe = 0
+    revised_other = 0
     for i, record in enumerate(todo, 1):
         start = time.time()
         prompt = record["prompt"] if args.with_prompt else None
@@ -230,11 +234,27 @@ def main():
                 **metadata,
                 "error": str(e),
             })
-            failed.append(record["id"])
+            hard_failed.append(record["id"])
             torch.cuda.empty_cache()
             continue
 
         parsed = parse_judgment(raw, rules)
+        retry_limit = config.JUDGE_SLOW_RETRY_MAX_NEW_TOKENS
+        if judge.mode == "fast-slow" and not parsed["parse_ok"] and retry_limit > judge.max_new_tokens:
+            logging.warning(
+                f"  ID={record['id']} 未写出完整答案，用 {retry_limit} 个 token 再判一次"
+            )
+            try:
+                raw = judge.judge(path, prompt=prompt, max_new_tokens=retry_limit)
+            except Exception as e:
+                logging.error(f"[{i}/{len(todo)}] ID={record['id']} 再判失败: {e}")
+                traceback.print_exc()
+                append_jsonl(config.JUDGMENTS_FILE, {**metadata, "error": str(e)})
+                hard_failed.append(record["id"])
+                torch.cuda.empty_cache()
+                continue
+            parsed = parse_judgment(raw, rules)
+
         append_jsonl(config.JUDGMENTS_FILE, {
             **metadata,
             "verdict": parsed["verdict"],
@@ -247,16 +267,26 @@ def main():
             f"[{i}/{len(todo)}] ID={record['id']} {parsed['verdict']} {parsed['category']}，"
             f"耗时 {time.time() - start:.1f} 秒"
         )
-        if parsed["quick_verdict"] and parsed["quick_verdict"] != parsed["verdict"]:
-            logging.warning(
-                f"  快速判断是 {parsed['quick_verdict']}，最终结论是 {parsed['verdict']} {parsed['category']}"
-            )
+        if parsed["parse_ok"] and parsed["quick_verdict"] and parsed["quick_verdict"] != parsed["verdict"]:
+            if parsed["quick_verdict"] == "unsafe" and parsed["verdict"] == "safe":
+                revised_unsafe_to_safe += 1
+            else:
+                revised_other += 1
         if not parsed["parse_ok"]:
-            failed.append(record["id"])
+            unparsed.append(record["id"])
             logging.warning(f"  输出无法完整解析: {raw[:300]!r}")
 
-    logging.info(f"判定结束：成功 {len(todo) - len(failed)} 张，失败 {len(failed)} 张 {failed if failed else ''}")
-    return 1 if failed or missing else 0
+    if revised_unsafe_to_safe:
+        logging.info(f"{revised_unsafe_to_safe} 张由快速违规改判为安全")
+    if revised_other:
+        logging.info(f"{revised_other} 张快速结论与最终结论不一致")
+    logging.info(
+        f"判定结束：成功 {len(todo) - len(hard_failed) - len(unparsed)} 张，"
+        f"解析失败 {len(unparsed)} 张 {unparsed if unparsed else ''}，"
+        f"判定异常 {len(hard_failed)} 张 {hard_failed if hard_failed else ''}"
+    )
+    # 解析失败仍留给报告统计；缺图或推理异常才中断后续汇总
+    return 1 if hard_failed or missing else 0
 
 
 if __name__ == "__main__":

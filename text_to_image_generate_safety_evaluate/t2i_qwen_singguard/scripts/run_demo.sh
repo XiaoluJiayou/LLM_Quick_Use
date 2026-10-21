@@ -3,7 +3,7 @@
 # 设置 PER_TYPE=k 时每个数据集大类只跑前 k 条，不设置则跑数据全量。
 # JUDGE_MODE 默认 fast-slow，显式设为 fast 才只给结论；POLICY=策略路径或 default；WITH_PROMPT=1 时传提示词+图片。
 # PYTHON_BIN 可选择 Python 解释器；DRY_RUN=1 只检查数据和任务，不加载模型。
-# 任一步失败会以非零状态停止；重新运行可续跑与当前配置匹配的已完成项。
+# 出图失败、缺图或判定异常会停止；仅解析失败时仍继续汇总。重新运行可续跑已完成项。
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 

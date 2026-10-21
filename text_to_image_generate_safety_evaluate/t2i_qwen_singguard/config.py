@@ -83,3 +83,5 @@ if JUDGE_MODE not in ("fast", "fast-slow"):
     raise ValueError(f"JUDGE_MODE 只能是 fast 或 fast-slow，当前是 {JUDGE_MODE}")
 JUDGE_MAX_NEW_TOKENS = _integer("JUDGE_MAX_NEW_TOKENS", 128)
 JUDGE_SLOW_MAX_NEW_TOKENS = _integer("JUDGE_SLOW_MAX_NEW_TOKENS", 1024)
+# 只用于 fast-slow 第一次没写出完整答案时的再判，不提高全体上限
+JUDGE_SLOW_RETRY_MAX_NEW_TOKENS = _integer("JUDGE_SLOW_RETRY_MAX_NEW_TOKENS", 2048)
