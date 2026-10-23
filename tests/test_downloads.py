@@ -6,6 +6,7 @@ import os
 import sys
 import types
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from model_dataset_download._download_cli import run_huggingface, run_modelscope
@@ -33,6 +34,50 @@ class DownloadTests(unittest.TestCase):
         self.assertNotIn("token", plan)
         self.assertNotIn("endpoint", plan)
         self.assertEqual(plan["repo_type"], "model")
+
+    def test_hf_default_local_dir_can_be_overridden(self):
+        with patch.dict(sys.modules, {"huggingface_hub": None}), contextlib.redirect_stdout(io.StringIO()):
+            default_plan = run_huggingface(
+                "zhangrjjj/Falcon",
+                repo_type="dataset",
+                default_local_dir="downloads/zhangrjjj--Falcon",
+                argv=["--dry-run"],
+            )
+            override_plan = run_huggingface(
+                "zhangrjjj/Falcon",
+                repo_type="dataset",
+                default_local_dir="downloads/zhangrjjj--Falcon",
+                argv=["--dry-run", "--local-dir", "D:/datasets/Falcon"],
+            )
+        self.assertEqual(Path(default_plan["local_dir"]), Path("downloads/zhangrjjj--Falcon"))
+        self.assertEqual(Path(override_plan["local_dir"]), Path("D:/datasets/Falcon"))
+
+    def test_hf_default_endpoint_can_be_overridden(self):
+        with patch.dict(sys.modules, {"huggingface_hub": None}), contextlib.redirect_stdout(io.StringIO()):
+            default_plan = run_huggingface("zhangrjjj/Falcon", repo_type="dataset", argv=["--dry-run"])
+            override_plan = run_huggingface(
+                "zhangrjjj/Falcon",
+                repo_type="dataset",
+                default_endpoint="https://hf-mirror.com",
+                argv=["--dry-run", "--endpoint", "https://huggingface.co"],
+            )
+        self.assertNotIn("endpoint", default_plan)
+        self.assertEqual(override_plan["endpoint"], "https://huggingface.co")
+
+    def test_hf_mirror_metadata_error_gets_actionable_message(self):
+        download = Mock(side_effect=RuntimeError("Distant resource does not seem to be on huggingface.co. firewall"))
+        with patch.dict(sys.modules, {"huggingface_hub": types.SimpleNamespace(snapshot_download=download)}), \
+                patch.dict(os.environ, {"HF_HUB_DISABLE_XET": "", "HF_ENDPOINT": ""}, clear=False), \
+                contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit) as ctx:
+                run_huggingface(
+                    "zhangrjjj/Falcon",
+                    repo_type="dataset",
+                    argv=["--endpoint", "https://hf-mirror.com", "--local-dir", "my-data"],
+                )
+            self.assertIn("去掉 --endpoint", str(ctx.exception))
+            self.assertEqual(os.environ.get("HF_HUB_DISABLE_XET"), "1")
+            self.assertEqual(os.environ.get("HF_ENDPOINT"), "https://hf-mirror.com")
 
     def test_hf_parameters_and_environment_token(self):
         download = Mock(return_value="local/result")
