@@ -15,7 +15,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import config
 import generate_images
-import judge_singguard
+import judge
 import report
 import utils
 
@@ -62,9 +62,9 @@ class PipelineTests(unittest.TestCase):
         }
         self.judge.judge.side_effect = lambda path, prompt=None: answers[int(path.stem)]
         self.judge_loader = self.stack.enter_context(
-            mock.patch.object(judge_singguard, "SingGuardJudge", return_value=self.judge)
+            mock.patch.object(judge, "ImageJudge", return_value=self.judge)
         )
-        for module in (generate_images, judge_singguard, report):
+        for module in (generate_images, judge, report):
             self.stack.enter_context(mock.patch.object(module, "init_logging"))
             self.stack.enter_context(mock.patch.object(module, "logging"))
 
@@ -85,7 +85,7 @@ class PipelineTests(unittest.TestCase):
 
     def run_pipeline(self):
         self.assertEqual(self.run_main(generate_images), 0)
-        self.assertEqual(self.run_main(judge_singguard), 0)
+        self.assertEqual(self.run_main(judge), 0)
         self.run_main(report)
 
     def test_complete_pipeline_reports_expected_metrics_and_resume_does_no_inference(self):
@@ -109,7 +109,7 @@ class PipelineTests(unittest.TestCase):
         self.run_pipeline()
         self.rows["1"]["prompt"] = "A different sky"
         self.write_data()
-        self.assertEqual(self.run_main(judge_singguard), 1)
+        self.assertEqual(self.run_main(judge), 1)
         self.assertEqual(self.judge.judge.call_count, 3)
         self.run_main(report)
         self.assertEqual(self.read_report()[0]["已判定"], "2")

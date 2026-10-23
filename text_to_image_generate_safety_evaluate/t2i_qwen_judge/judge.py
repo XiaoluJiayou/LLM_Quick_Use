@@ -1,4 +1,4 @@
-"""用 SingGuard-8B 按策略文件判定生成的图片是否违规。
+"""用裁判模型按策略文件判定生成的图片是否违规。
 
 默认只传图片；加 --with-prompt 时把提示词作为 user、图片作为 assistant。
 结果追加到 judgments.jsonl，按策略指纹、模式、输入方式续跑。
@@ -38,7 +38,7 @@ def init_logging():
     )
 
 
-class SingGuardJudge:
+class ImageJudge:
     def __init__(self, model_dir, policy, mode):
         import torch
         from PIL import Image
@@ -51,10 +51,10 @@ class SingGuardJudge:
         model_dir = Path(model_dir)
         if not (model_dir / "config.json").is_file():
             raise FileNotFoundError(
-                "没有找到 SingGuard 的 config.json，所以这个路径不能当作本地模型加载。\n"
+                "没有找到裁判模型的 config.json，所以这个路径不能当作本地模型加载。\n"
                 f"当前路径: {model_dir}\n"
                 "先在服务器上定位权重目录：\n"
-                "  find /root/autodl-tmp /root/.cache/modelscope -name config.json | grep -i guard\n"
+                "  find /root/autodl-tmp /root/.cache/modelscope -name config.json | grep -i judge\n"
                 "然后指定它所在的目录，例如：\n"
                 "  export JUDGE_MODEL_DIR=/找到的目录"
             )
@@ -153,7 +153,7 @@ class SingGuardJudge:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="用 SingGuard-8B 判定生成的图片是否违规")
+    parser = argparse.ArgumentParser(description="用裁判模型判定生成的图片是否违规")
     parser.add_argument("--per-type", type=positive_int, default=None, help="每个大类只取前 k 条（小样本试跑），默认全量")
     parser.add_argument("--mode", choices=("fast", "fast-slow"), default=config.JUDGE_MODE,
                         help="默认 fast-slow（写出推理，以最终答案为准）；fast 只输出结论")
@@ -195,7 +195,7 @@ def main():
         f"已判定 {sum(r['id'] in done for r in records)} 条，待判定 {len(todo)} 条"
     )
     if policy is None:
-        logging.info("未传入自定义策略，使用 SingGuard 内置默认分类")
+        logging.info("未传入自定义策略，使用裁判模型内置默认分类")
     if args.dry_run:
         logging.info(f"预览完成：已有图片待判定 {len(todo)} 张，补全图片后待判定 {len(missing)} 张")
         logging.info("未验证 GPU、模型权重或实际推理；实际运行前需先补全图片")
@@ -207,7 +207,7 @@ def main():
     if not torch.cuda.is_available():
         sys.exit("没有检测到 GPU：AutoDL 实例需要用正常模式（带 GPU）开机，无卡模式只能用来准备环境")
 
-    judge = SingGuardJudge(config.JUDGE_MODEL_DIR, policy, args.mode)
+    judge = ImageJudge(config.JUDGE_MODEL_DIR, policy, args.mode)
     hard_failed = []
     unparsed = []
     revised_unsafe_to_safe = 0

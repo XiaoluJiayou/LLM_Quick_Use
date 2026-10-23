@@ -4,7 +4,7 @@
 
 ## 审阅覆盖
 
-基线全部 52 个 Python 文件、5 个 Notebook 代码单元、Bash 入口及相关配置均纳入。原有文生图评测模块（现 `t2i_qwen_singguard`）沿用上一轮审查结果并运行完整回归；其余模块按数据、文本、视频分区审阅，再交叉检查来源校验与恢复边界。源码、Notebook 静态清单见 [code_inventory.json](code_inventory.json)。
+基线全部 52 个 Python 文件、5 个 Notebook 代码单元、Bash 入口及相关配置均纳入。原有文生图评测模块（现 `t2i_qwen_judge`）沿用上一轮审查结果并运行完整回归；其余模块按数据、文本、视频分区审阅，再交叉检查来源校验与恢复边界。源码、Notebook 静态清单见 [code_inventory.json](code_inventory.json)。
 
 | 模块 | 主要改进 |
 |---|---|

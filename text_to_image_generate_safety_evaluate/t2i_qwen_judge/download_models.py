@@ -7,9 +7,9 @@ model_dir = snapshot_download(
 )
 print(model_dir)
 
-# inclusionAI/Sing-Guard-8b 模型下载
+# 裁判模型权重（上游仓库 inclusionAI/Sing-Guard-8b）
 model_dir = snapshot_download(
     "inclusionAI/Sing-Guard-8b",
-    local_dir="/root/autodl-tmp/models/Sing-Guard-8b",
+    local_dir="/root/autodl-tmp/models/t2i-judge",
 )
 print(model_dir)

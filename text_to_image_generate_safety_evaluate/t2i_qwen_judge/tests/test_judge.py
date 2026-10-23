@@ -13,13 +13,13 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import config
-import judge_singguard as judge_module
+import judge as judge_module
 import utils
 
 
 class TemplateTests(unittest.TestCase):
     def setUp(self):
-        self.judge = judge_module.SingGuardJudge.__new__(judge_module.SingGuardJudge)
+        self.judge = judge_module.ImageJudge.__new__(judge_module.ImageJudge)
         self.judge.image_class = Image
         self.judge.policy = "### A. Risk\nThe complete custom rule."
         self.judge.requested_mode = "fast"
@@ -127,9 +127,9 @@ class JudgeFlowTests(unittest.TestCase):
 
     def _run(self, *args):
         with (
-            mock.patch.object(sys, "argv", ["judge_singguard.py", *args]),
+            mock.patch.object(sys, "argv", ["judge.py", *args]),
             mock.patch.dict(sys.modules, {"torch": self.fake_torch}),
-            mock.patch.object(judge_module, "SingGuardJudge", return_value=self.fake_model),
+            mock.patch.object(judge_module, "ImageJudge", return_value=self.fake_model),
         ):
             return judge_module.main()
 
@@ -142,9 +142,9 @@ class JudgeFlowTests(unittest.TestCase):
             return real_import(name, *args, **kwargs)
 
         with (
-            mock.patch.object(sys, "argv", ["judge_singguard.py", "--dry-run"]),
+            mock.patch.object(sys, "argv", ["judge.py", "--dry-run"]),
             mock.patch.object(builtins, "__import__", side_effect=checked_import),
-            mock.patch.object(judge_module, "SingGuardJudge") as model_class,
+            mock.patch.object(judge_module, "ImageJudge") as model_class,
         ):
             self.assertEqual(judge_module.main(), 0)
         model_class.assert_not_called()

@@ -724,7 +724,7 @@
       "code_cells": 7
     },
     {
-      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_singguard/config.py",
+      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_judge/config.py",
       "kind": "python",
       "lines": 77,
       "imports": [
@@ -734,7 +734,7 @@
       ]
     },
     {
-      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_singguard/generate_images.py",
+      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_judge/generate_images.py",
       "kind": "python",
       "lines": 181,
       "imports": [
@@ -751,7 +751,7 @@
       ]
     },
     {
-      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_singguard/judge_singguard.py",
+      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_judge/judge.py",
       "kind": "python",
       "lines": 263,
       "imports": [
@@ -770,7 +770,7 @@
       ]
     },
     {
-      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_singguard/report.py",
+      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_judge/report.py",
       "kind": "python",
       "lines": 181,
       "imports": [
@@ -785,7 +785,7 @@
       ]
     },
     {
-      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_singguard/tests/test_generation.py",
+      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_judge/tests/test_generation.py",
       "kind": "python",
       "lines": 311,
       "imports": [
@@ -807,7 +807,7 @@
       ]
     },
     {
-      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_singguard/tests/test_judge.py",
+      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_judge/tests/test_judge.py",
       "kind": "python",
       "lines": 225,
       "imports": [
@@ -816,7 +816,7 @@
         "config",
         "contextlib",
         "csv",
-        "judge_singguard",
+        "judge",
         "pathlib",
         "sys",
         "tempfile",
@@ -826,7 +826,7 @@
       ]
     },
     {
-      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_singguard/tests/test_pipeline.py",
+      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_judge/tests/test_pipeline.py",
       "kind": "python",
       "lines": 118,
       "imports": [
@@ -836,7 +836,7 @@
         "csv",
         "generate_images",
         "io",
-        "judge_singguard",
+        "judge",
         "pathlib",
         "report",
         "sys",
@@ -847,7 +847,7 @@
       ]
     },
     {
-      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_singguard/tests/test_report.py",
+      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_judge/tests/test_report.py",
       "kind": "python",
       "lines": 86,
       "imports": [
@@ -860,7 +860,7 @@
       ]
     },
     {
-      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_singguard/tests/test_utils.py",
+      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_judge/tests/test_utils.py",
       "kind": "python",
       "lines": 244,
       "imports": [
@@ -879,7 +879,7 @@
       ]
     },
     {
-      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_singguard/utils.py",
+      "file": "text_to_image_generate_safety_evaluate/t2i_qwen_judge/utils.py",
       "kind": "python",
       "lines": 393,
       "imports": [

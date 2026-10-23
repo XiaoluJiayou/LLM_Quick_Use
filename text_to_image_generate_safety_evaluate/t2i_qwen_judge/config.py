@@ -52,7 +52,7 @@ def _model_name(path):
 DATA_JSON = Path(_env("DATA_JSON", BASE_DIR / "data" / "T2I-RiskyPrompt.zh.json")).expanduser()
 MODEL_ROOT = Path(_env("MODEL_ROOT", "/root/autodl-tmp/models")).expanduser()
 T2I_MODEL_DIR = _model_dir(_env("T2I_MODEL_DIR", MODEL_ROOT / "Qwen-Image-2.1"), "model_index.json")
-JUDGE_MODEL_DIR = _model_dir(_env("JUDGE_MODEL_DIR", MODEL_ROOT / "Sing-Guard-8b"), "config.json")
+JUDGE_MODEL_DIR = _model_dir(_env("JUDGE_MODEL_DIR", MODEL_ROOT / "t2i-judge"), "config.json")
 POLICY_FILE = Path(_env("POLICY_FILE", BASE_DIR / "policy_gbt_t2i.md")).expanduser()
 
 # 输出按出图模型分目录，换成 Turbo 版时结果不会混在一起

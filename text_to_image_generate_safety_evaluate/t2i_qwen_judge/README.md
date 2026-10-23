@@ -1,19 +1,19 @@
-# Qwen-Image-2.1 + SingGuard 文生图安全评测
+# Qwen-Image-2.1 + 裁判模型文生图安全评测
 
-用 `T2I-RiskyPrompt.zh.json`（国标 A.1–A.4）出图 → SingGuard 按 `policy_gbt_t2i.md` 判定 → 输出 CSV。面向 AutoDL GPU。
+用 `T2I-RiskyPrompt.zh.json`（国标 A.1–A.4）出图 → 裁判模型按 `policy_gbt_t2i.md` 判定 → 输出 CSV。面向 AutoDL GPU。
 
 ---
 
 ## 最快跑通（AutoDL）
 
-本目录可单独打包上传（只需 `t2i_qwen_singguard/`，不必带整个仓库）。解压后进入该目录即可。
+本目录可单独打包上传（只需 `t2i_qwen_judge/`，不必带整个仓库）。解压后进入该目录即可。
 
 ### 1. 环境
 
 镜像自带 CUDA + PyTorch ≥ 2.6，再装依赖：
 
 ```bash
-cd /root/t2i_qwen_singguard   # 按你实际上传/解压后的路径改
+cd /root/t2i_qwen_judge   # 按你实际上传/解压后的路径改
 python -m pip install -r requirements.txt
 ```
 
@@ -36,9 +36,9 @@ python download_models.py
 会依次下载到：
 
 - `/root/autodl-tmp/models/Qwen-Image-2.1`
-- `/root/autodl-tmp/models/Sing-Guard-8b`
+- `/root/autodl-tmp/models/t2i-judge`
 
-与 `config.py` 默认路径一致，一般无需再改 `T2I_MODEL_DIR` / `JUDGE_MODEL_DIR`。
+与 `config.py` 默认路径一致，一般无需再改 `T2I_MODEL_DIR` / `JUDGE_MODEL_DIR`。若服务器上仍是旧目录名，可显式指定：`export JUDGE_MODEL_DIR=/旧路径`。
 
 ### 4. 小样本试跑（每大类 100 条，约 400 张）
 
@@ -91,14 +91,14 @@ tail -f outputs/run_demo.log
 ```bash
 JUDGE_MODE=fast PER_TYPE=100 bash scripts/run_demo.sh        # 只要结论
 WITH_PROMPT=1 PER_TYPE=100 bash scripts/run_demo.sh          # 提示词+图一起判
-POLICY=default PER_TYPE=100 bash scripts/run_demo.sh         # SingGuard 内置分类
+POLICY=default PER_TYPE=100 bash scripts/run_demo.sh         # 裁判模型内置分类
 ```
 
 上面的 `scripts/run_demo.sh` 会把下面三步一次跑完。想先出图、看完图再判定，就自己按这个顺序分开跑。后一步会读前一步写在同一个 `OUTPUT_DIR` 里的结果，顺序不能倒。`--per-type 100` 和试跑一样，每个大类只取 100 条；去掉它就是全量。判定和报告默认 `fast-slow`。个别图片没写出完整答案时，会用 2048 个 token 再判一次；仍然解析失败也继续汇总，不会挡住报告。出图失败、缺图或判定异常才会停。
 
 ```bash
 python generate_images.py --per-type 100   # 1. 按提示词出图，保存到 images/
-python judge_singguard.py --per-type 100   # 2. 用 SingGuard 判定这些图
+python judge.py --per-type 100             # 2. 用裁判模型判定这些图
 python report.py --per-type 100            # 3. 把判定汇总成 report_*.csv
 ```
 
@@ -110,7 +110,7 @@ python report.py --per-type 100            # 3. 把判定汇总成 report_*.csv
 |---|---|
 | `config.py` | 路径与参数（可用环境变量覆盖） |
 | `utils.py` | 读 JSON、续跑指纹、解析输出 |
-| `generate_images.py` / `judge_singguard.py` / `report.py` | 出图 / 判定 / 报告 |
+| `generate_images.py` / `judge.py` / `report.py` | 出图 / 判定 / 报告 |
 | `policy_gbt_t2i.md` | 国标五大类策略 |
 | `scripts/run_demo.sh` | 三步串联 |
 | `download_models.py` | ModelScope 下载两个模型 |

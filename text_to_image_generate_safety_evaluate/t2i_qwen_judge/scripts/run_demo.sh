@@ -53,7 +53,7 @@ fi
 
 echo "===== $(date '+%F %T') 开始（PER_TYPE=${PER_TYPE:-全量}，JUDGE_MODE=${JUDGE_MODE:-fast-slow}，POLICY=${POLICY:-默认文件}，WITH_PROMPT=${WITH_PROMPT:-0}，DRY_RUN=$DRY_RUN）====="
 "$PYTHON_BIN" generate_images.py "${args[@]}" "${dry_args[@]}"
-"$PYTHON_BIN" judge_singguard.py "${args[@]}" "${mode_args[@]}" "${policy_args[@]}" "${prompt_args[@]}" "${dry_args[@]}"
+"$PYTHON_BIN" judge.py "${args[@]}" "${mode_args[@]}" "${policy_args[@]}" "${prompt_args[@]}" "${dry_args[@]}"
 if [ "$DRY_RUN" != "1" ]; then
     "$PYTHON_BIN" report.py "${args[@]}" "${mode_args[@]}" "${policy_args[@]}" "${prompt_args[@]}"
 fi

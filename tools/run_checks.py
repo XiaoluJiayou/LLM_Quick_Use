@@ -15,7 +15,7 @@ def main():
     commands = [
         (ROOT, [sys.executable, "-B", str(ROOT / "tools" / "check_project.py")]),
         (ROOT, [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"]),
-        (ROOT / "text_to_image_generate_safety_evaluate" / "t2i_qwen_singguard",
+        (ROOT / "text_to_image_generate_safety_evaluate" / "t2i_qwen_judge",
          [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"]),
     ]
     failed = False

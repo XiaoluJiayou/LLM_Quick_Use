@@ -44,11 +44,11 @@ class ModelDirectoryConfigTests(unittest.TestCase):
                 with mock.patch.object(Path, "is_file", autospec=True, side_effect=probe):
                     config = self.load_config()
                 self.assertEqual(config.T2I_MODEL_DIR, model.resolve())
-                self.assertEqual(config.JUDGE_MODEL_DIR, (self.models / "Sing-Guard-8b").resolve())
+                self.assertEqual(config.JUDGE_MODEL_DIR, (self.models / "t2i-judge").resolve())
 
     def test_import_tolerates_permission_error_while_resolving_model_paths(self):
         original_resolve = Path.resolve
-        expected = {self.models / "Qwen-Image-2.1", self.models / "Sing-Guard-8b"}
+        expected = {self.models / "Qwen-Image-2.1", self.models / "t2i-judge"}
 
         def resolve(path, *args, **kwargs):
             if path in expected:
@@ -58,10 +58,10 @@ class ModelDirectoryConfigTests(unittest.TestCase):
         with mock.patch.object(Path, "resolve", autospec=True, side_effect=resolve):
             config = self.load_config()
         self.assertEqual(config.T2I_MODEL_DIR, (self.models / "Qwen-Image-2.1").absolute())
-        self.assertEqual(config.JUDGE_MODEL_DIR, (self.models / "Sing-Guard-8b").absolute())
+        self.assertEqual(config.JUDGE_MODEL_DIR, (self.models / "t2i-judge").absolute())
 
     def test_flat_layout_takes_priority_over_snapshot_layout(self):
-        for name, marker in (("Qwen-Image-2.1", "model_index.json"), ("Sing-Guard-8b", "config.json")):
+        for name, marker in (("Qwen-Image-2.1", "model_index.json"), ("t2i-judge", "config.json")):
             model = self.models / name
             nested = model / "snapshots" / "master"
             nested.mkdir(parents=True)
@@ -69,23 +69,23 @@ class ModelDirectoryConfigTests(unittest.TestCase):
             (nested / marker).write_text("{}", encoding="utf-8")
         config = self.load_config()
         self.assertEqual(config.T2I_MODEL_DIR, (self.models / "Qwen-Image-2.1").resolve())
-        self.assertEqual(config.JUDGE_MODEL_DIR, (self.models / "Sing-Guard-8b").resolve())
+        self.assertEqual(config.JUDGE_MODEL_DIR, (self.models / "t2i-judge").resolve())
 
     def test_modelscope_snapshot_layout_is_detected(self):
-        for name, marker in (("Qwen-Image-2.1", "model_index.json"), ("Sing-Guard-8b", "config.json")):
+        for name, marker in (("Qwen-Image-2.1", "model_index.json"), ("t2i-judge", "config.json")):
             nested = self.models / name / "snapshots" / "master"
             nested.mkdir(parents=True)
             (nested / marker).write_text("{}", encoding="utf-8")
         config = self.load_config()
         self.assertEqual(config.T2I_MODEL_DIR, (self.models / "Qwen-Image-2.1" / "snapshots" / "master").resolve())
-        self.assertEqual(config.JUDGE_MODEL_DIR, (self.models / "Sing-Guard-8b" / "snapshots" / "master").resolve())
+        self.assertEqual(config.JUDGE_MODEL_DIR, (self.models / "t2i-judge" / "snapshots" / "master").resolve())
         self.assertEqual(config.T2I_MODEL_NAME, "Qwen-Image-2.1")
 
     def test_import_does_not_create_missing_model_directories(self):
         config = self.load_config()
         self.assertFalse(self.models.exists())
         self.assertEqual(config.T2I_MODEL_DIR, (self.models / "Qwen-Image-2.1").resolve())
-        self.assertEqual(config.JUDGE_MODEL_DIR, (self.models / "Sing-Guard-8b").resolve())
+        self.assertEqual(config.JUDGE_MODEL_DIR, (self.models / "t2i-judge").resolve())
 
     def test_non_permission_filesystem_errors_are_not_silenced(self):
         with mock.patch.object(Path, "is_file", side_effect=OSError("device failure")):

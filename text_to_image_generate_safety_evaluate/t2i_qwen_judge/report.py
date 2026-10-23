@@ -1,4 +1,4 @@
-"""汇总 SingGuard 的判定结果。
+"""汇总裁判模型的判定结果。
 
 国标策略按五大类分组，其他策略按数据集标签分组。
 解析失败单独统计，不混入违规率和命中率的有效判定分母。
@@ -131,12 +131,12 @@ def format_table(rows):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="汇总 SingGuard 判定结果，生成评测报告")
+    parser = argparse.ArgumentParser(description="汇总裁判模型判定结果，生成评测报告")
     parser.add_argument("--per-type", type=positive_int, default=None, help="每个大类只取前 k 条（与小样本试跑保持一致），默认全量")
     parser.add_argument("--mode", choices=("fast", "fast-slow"), default=config.JUDGE_MODE,
                         help="只统计该模式的判定。默认读配置或环境变量 JUDGE_MODE")
     parser.add_argument("--policy", default=None,
-                        help="策略文件路径，或 default（SingGuard 内置分类）。默认用 config.POLICY_FILE")
+                        help="策略文件路径，或 default（裁判模型内置分类）。默认用 config.POLICY_FILE")
     parser.add_argument("--with-prompt", action="store_true",
                         help="只统计「提示词+图片」输入方式的判定结果")
     args = parser.parse_args()
